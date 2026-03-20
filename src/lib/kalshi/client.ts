@@ -49,20 +49,37 @@ const PROD_BASE = "https://trading-api.kalshi.com/trade-api/v2";
 
 interface KalshiClientConfig {
   keyId: string;
-  privateKeyPath: string;
-  baseUrl?: string;
+  privateKeyPem: string;
+  baseUrl: string;
 }
 
 function loadConfig(): KalshiClientConfig {
   const isDemo = (process.env.KALSHI_API_BASE_URL || DEMO_BASE).includes("demo");
 
-  return {
-    keyId: isDemo
-      ? process.env.KALSHI_API_KEY_ID_DEMO!
-      : process.env.KALSHI_API_KEY_ID!,
-    privateKeyPath: isDemo
+  const keyId = isDemo
+    ? process.env.KALSHI_API_KEY_ID_DEMO!
+    : process.env.KALSHI_API_KEY_ID!;
+
+  // Support inline PEM via env var (for Vercel) or file path (for local dev)
+  let privateKeyPem: string;
+  const envPem = isDemo
+    ? process.env.KALSHI_PRIVATE_KEY_DEMO
+    : process.env.KALSHI_PRIVATE_KEY;
+
+  if (envPem) {
+    // Env var contains the PEM content directly (newlines as \n)
+    privateKeyPem = envPem.replace(/\\n/g, "\n");
+  } else {
+    // Fall back to reading from file path
+    const keyPath = isDemo
       ? process.env.KALSHI_API_PRIVATE_KEY_PATH_DEMO || "./kalshi/private_key_demo.pem"
-      : process.env.KALSHI_API_PRIVATE_KEY_PATH || "./kalshi/private_key.pem",
+      : process.env.KALSHI_API_PRIVATE_KEY_PATH || "./kalshi/private_key.pem";
+    privateKeyPem = fs.readFileSync(path.resolve(keyPath), "utf-8");
+  }
+
+  return {
+    keyId,
+    privateKeyPem,
     baseUrl: process.env.KALSHI_API_BASE_URL || DEMO_BASE,
   };
 }
@@ -89,10 +106,6 @@ async function kalshiFetch<T>(
   params?: Record<string, string>
 ): Promise<T> {
   const config = loadConfig();
-  const privateKeyPem = fs.readFileSync(
-    path.resolve(config.privateKeyPath),
-    "utf-8"
-  );
 
   const url = new URL(`${config.baseUrl}${endpoint}`);
   if (params) {
@@ -101,7 +114,7 @@ async function kalshiFetch<T>(
 
   const timestamp = Math.floor(Date.now() / 1000);
   const requestPath = url.pathname + url.search;
-  const signature = signRequest(privateKeyPem, timestamp, method, requestPath);
+  const signature = signRequest(config.privateKeyPem, timestamp, method, requestPath);
 
   const response = await fetch(url.toString(), {
     method,
