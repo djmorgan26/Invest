@@ -12,6 +12,7 @@ import {
   X,
   Zap,
   ClipboardCheck,
+  DollarSign,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/dashboard/predictions", label: "Predictions", icon: Brain },
   { href: "/dashboard/trades", label: "Trades", icon: ArrowLeftRight },
   { href: "/dashboard/strategies", label: "Strategies", icon: Zap },
+  { href: "/dashboard/pnl", label: "P&L", icon: DollarSign },
   { href: "/dashboard/reviews", label: "Reviews", icon: ClipboardCheck },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

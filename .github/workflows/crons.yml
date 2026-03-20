@@ -127,7 +127,7 @@ jobs:
     steps:
       - name: Orderbook snapshots
         run: |
-          HTTP_CODE=$(curl -sS -o /tmp/response.txt -w "%{http_code}" \
+          HTTP_CODE=$(curl -sS --max-time 55 -o /tmp/response.txt -w "%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.APP_URL }}/api/orderbook/snapshot")
           cat /tmp/response.txt

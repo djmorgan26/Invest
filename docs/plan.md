@@ -63,7 +63,7 @@ Phase 3 (Self-Optimizing Intelligence Layer) complete. Phase 2.5 (Kalshi-aware t
 - [x] Lowered Mean Reversion min_move (12¢ from 15¢) for more opportunities
 - [x] Kalshi mechanics reference doc (`docs/kalshi-mechanics.md`)
 
-### Phase 4: Data Collection & Strategy Validation [IN PROGRESS]
+### Phase 4: Data Collection & Strategy Validation [COMPLETE]
 - [x] Auto-watchlist all evaluated markets (unblocks Mean Reversion)
 - [x] Expand price snapshots to top 200 markets by volume
 - [x] Store order book depth (`orderbook_snapshots` table + API route)
@@ -71,10 +71,14 @@ Phase 3 (Self-Optimizing Intelligence Layer) complete. Phase 2.5 (Kalshi-aware t
 - [x] Increase scan frequency to every 5 min
 - [x] Per-trade fee tracking in paper trades
 - [x] Remove all Vercel cron references (using GitHub Actions)
-- [ ] Event cluster arbitrage strategy
-- [ ] Volume spike detector strategy
-- [ ] Slippage estimation from order book depth
-- [ ] Automated daily P&L dashboard
+- [x] Volume spike detector strategy (`src/lib/strategies/volume-spike.ts`)
+- [x] Event cluster arbitrage strategy (`src/lib/strategies/event-cluster.ts`)
+- [x] Slippage estimation from order book depth (`src/lib/strategies/slippage.ts`)
+- [x] Slippage integrated into autoTrade — adjusts entry price, skips if >3¢
+- [x] Event metadata enrichment in market sync (fetches mutually_exclusive + category)
+- [x] Daily P&L dashboard (`src/app/dashboard/pnl/page.tsx`) with go-live readiness tracker
+- [x] P&L API route (`src/app/api/pnl/daily/route.ts`)
+- [x] Orderbook cron timeout fix (55s max-time)
 
 ### Phase 5: Statistical Validation & Strategy Tuning [BACKLOG]
 - [ ] Confidence intervals on win rate per strategy

@@ -12,8 +12,19 @@ import { wideSpread } from "./wide-spread";
 import { stalePrice } from "./stale-price";
 import { extremeValue } from "./extreme-value";
 import { meanReversion } from "./mean-reversion";
+import { volumeSpike } from "./volume-spike";
+import { eventCluster } from "./event-cluster";
+import { estimateSlippageYes, estimateSlippageNo } from "./slippage";
+import type { DepthLevel } from "./slippage";
 
-const ALL_STRATEGIES: Strategy[] = [wideSpread, stalePrice, extremeValue, meanReversion];
+const ALL_STRATEGIES: Strategy[] = [
+  wideSpread,
+  stalePrice,
+  extremeValue,
+  meanReversion,
+  volumeSpike,
+  eventCluster,
+];
 
 const STARTING_BALANCE = 10000;
 const MAX_OPEN_PER_STRATEGY = 5;
@@ -151,9 +162,37 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
       .single();
 
     // Calculate actual entry price (what we'd pay as a taker)
-    const entryPrice = opp.side === "yes"
+    let entryPrice = opp.side === "yes"
       ? (market?.yes_ask ?? opp.fair_value * 100) / 100
       : (100 - (market?.yes_bid ?? (1 - opp.fair_value) * 100)) / 100;
+
+    // --- SLIPPAGE ADJUSTMENT: use orderbook depth for realistic entry ---
+    const { data: latestOb } = await supabase
+      .from("orderbook_snapshots")
+      .select("depth_yes_bid, depth_yes_ask")
+      .eq("ticker", opp.ticker)
+      .order("snapshot_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (latestOb) {
+      const depthBid = (latestOb.depth_yes_bid ?? []) as DepthLevel[];
+      const depthAsk = (latestOb.depth_yes_ask ?? []) as DepthLevel[];
+      const slipEst = opp.side === "yes"
+        ? estimateSlippageYes(depthAsk, opp.quantity)
+        : estimateSlippageNo(depthBid, opp.quantity);
+
+      if (slipEst.canFill && slipEst.effectivePrice > 0) {
+        entryPrice = slipEst.effectivePrice;
+      }
+
+      // Skip trade if slippage exceeds 3¢
+      if (slipEst.slippageCents > 3) {
+        details.push({ ...pick(opp), action: `skipped: slippage ${slipEst.slippageCents.toFixed(1)}¢ > 3¢ max` });
+        skipped++;
+        continue;
+      }
+    }
 
     // --- GUARDRAIL: Entry price safety ---
     if (!isEntryPriceSafe(entryPrice, opp.strategy_id)) {
