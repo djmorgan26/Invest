@@ -1,16 +1,15 @@
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { StatCard } from "@/components/ui/stat-card";
+import { SideBadge } from "@/components/ui/side-badge";
+import { CategoryPill } from "@/components/ui/category-pill";
+import { StrategyPill } from "@/components/ui/strategy-pill";
+import { PnlValue } from "@/components/ui/pnl-value";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartsSection } from "@/components/predictions/charts-section";
 import { Backtester } from "@/components/predictions/backtester";
-import type {
-  Prediction,
-  Market,
-  Event,
-  StrategyRow,
-  PaperTrade,
-} from "@/lib/supabase/types";
+import type { Prediction, Market, Event, StrategyRow, PaperTrade } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
 
@@ -39,42 +38,10 @@ interface EnrichedPrediction {
 
 // ── Helper Components ────────────────────────────────────────────────
 
-function SideBadge({ side }: { side: "yes" | "no" }) {
-  return (
-    <span
-      className={
-        side === "yes"
-          ? "rounded bg-[color:var(--success)]/15 px-2 py-0.5 text-xs font-medium text-[color:var(--success)]"
-          : "rounded bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive"
-      }
-    >
-      {side.toUpperCase()}
-    </span>
-  );
-}
-
-function CategoryPill({ category }: { category: string | null }) {
-  if (!category) return null;
-  return (
-    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-      {category}
-    </span>
-  );
-}
-
-function StrategyPill({ name }: { name: string | null }) {
-  if (!name) return null;
-  return (
-    <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-      {name}
-    </span>
-  );
-}
-
 function StatusBadge({ status }: { status: string }) {
   if (status === "correct") {
     return (
-      <span className="rounded bg-[color:var(--success)]/15 px-2 py-0.5 text-xs font-medium text-[color:var(--success)]">
+      <span className="rounded bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
         Correct
       </span>
     );
@@ -244,61 +211,45 @@ export default async function PredictionsPage() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Predictions"
-          value={totalCount.toString()}
-          change={
-            pendingCount > 0
-              ? {
-                  value: `${pendingCount} pending`,
-                  positive: true,
-                }
-              : undefined
-          }
-        />
-        <StatCard
-          title="Accuracy"
-          value={resolvedCount > 0 ? `${(accuracy * 100).toFixed(1)}%` : "N/A"}
-          change={
-            resolvedCount > 0
-              ? {
-                  value: `${resolvedCount} resolved`,
-                  positive: accuracy >= 0.5,
-                }
-              : undefined
-          }
-        />
-        <StatCard
-          title="Avg Edge"
-          value={
-            totalCount > 0
-              ? `${(avgEdge * 100).toFixed(1)}\u00a2`
-              : "N/A"
-          }
-          change={
-            totalCount > 0
-              ? {
-                  value: `${(avgConfidence * 100).toFixed(1)}% avg confidence`,
-                  positive: avgConfidence >= 0.5,
-                }
-              : undefined
-          }
-        />
-        <StatCard
-          title="Traded Rate"
-          value={
-            totalCount > 0 ? `${(tradedRate * 100).toFixed(1)}%` : "N/A"
-          }
-          change={
-            tradedCount > 0
-              ? {
-                  value: `${tradedCount} traded`,
-                  positive: true,
-                }
-              : undefined
-          }
-        />
+      <div className="flex flex-wrap gap-3">
+        <div className="rounded-lg bg-secondary/50 px-4 py-2">
+          <span className="text-xs text-muted-foreground">Total</span>
+          <span className="ml-2 font-mono text-sm font-medium">{totalCount}</span>
+          {pendingCount > 0 && (
+            <span className="ml-1.5 text-xs text-success">{pendingCount} pending</span>
+          )}
+        </div>
+        <div className="rounded-lg bg-secondary/50 px-4 py-2">
+          <span className="text-xs text-muted-foreground">Accuracy</span>
+          <span className="ml-2 font-mono text-sm font-medium">
+            {resolvedCount > 0 ? `${(accuracy * 100).toFixed(1)}%` : "N/A"}
+          </span>
+          {resolvedCount > 0 && (
+            <span className={`ml-1.5 text-xs ${accuracy >= 0.5 ? "text-success" : "text-destructive"}`}>
+              {resolvedCount} resolved
+            </span>
+          )}
+        </div>
+        <div className="rounded-lg bg-secondary/50 px-4 py-2">
+          <span className="text-xs text-muted-foreground">Avg Edge</span>
+          <span className="ml-2 font-mono text-sm font-medium">
+            {totalCount > 0 ? `${(avgEdge * 100).toFixed(1)}\u00a2` : "N/A"}
+          </span>
+          {totalCount > 0 && (
+            <span className={`ml-1.5 text-xs ${avgConfidence >= 0.5 ? "text-success" : "text-destructive"}`}>
+              {(avgConfidence * 100).toFixed(1)}% avg confidence
+            </span>
+          )}
+        </div>
+        <div className="rounded-lg bg-secondary/50 px-4 py-2">
+          <span className="text-xs text-muted-foreground">Traded Rate</span>
+          <span className="ml-2 font-mono text-sm font-medium">
+            {totalCount > 0 ? `${(tradedRate * 100).toFixed(1)}%` : "N/A"}
+          </span>
+          {tradedCount > 0 && (
+            <span className="ml-1.5 text-xs text-success">{tradedCount} traded</span>
+          )}
+        </div>
       </div>
 
       {/* Pending Predictions — Card Grid */}
@@ -312,12 +263,7 @@ export default async function PredictionsPage() {
           )}
         </h2>
         {pendingPredictions.length === 0 ? (
-          <div className="rounded-lg border border-border bg-card p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              No pending predictions. Run the prediction pipeline to generate
-              market analysis.
-            </p>
-          </div>
+          <EmptyState message="No pending predictions. Run the prediction pipeline to generate market analysis." />
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {pendingPredictions.map((prediction) => (
@@ -364,15 +310,12 @@ export default async function PredictionsPage() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Edge</p>
-                    <p
-                      className={`mt-0.5 font-mono text-sm font-medium ${
-                        prediction.edge >= 0
-                          ? "text-[color:var(--success)]"
-                          : "text-destructive"
-                      }`}
-                    >
-                      {(prediction.edge * 100).toFixed(1)}&cent;
-                    </p>
+                    <PnlValue
+                      value={prediction.edge * 100}
+                      size="sm"
+                      showSign={false}
+                      format={(v) => `${v.toFixed(1)}\u00a2`}
+                    />
                   </div>
                 </div>
 
@@ -428,65 +371,37 @@ export default async function PredictionsPage() {
           {resolvedCount > 0 && (
             <p className="text-sm">
               Accuracy:{" "}
-              <span
-                className={`font-mono font-medium ${
-                  accuracy >= 0.5
-                    ? "text-[color:var(--success)]"
-                    : "text-destructive"
-                }`}
-              >
-                {(accuracy * 100).toFixed(1)}%
-              </span>
+              <PnlValue
+                value={accuracy - 0.5}
+                size="sm"
+                showSign={false}
+                format={() => `${(accuracy * 100).toFixed(1)}%`}
+              />
             </p>
           )}
         </div>
         {resolvedPredictions.length === 0 ? (
-          <div className="rounded-lg border border-border bg-card p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              No resolved predictions yet.
-            </p>
-          </div>
+          <EmptyState message="No resolved predictions yet." />
         ) : (
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-card text-left">
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Market
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Category
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Side
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Strategy
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">
-                    Fair Value / Price
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">
-                    Edge
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Result
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">
-                    Trade P&L
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Resolved
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className="rounded-lg border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-card">
+                  <TableHead className="px-4">Market</TableHead>
+                  <TableHead className="px-4">Category</TableHead>
+                  <TableHead className="px-4">Side</TableHead>
+                  <TableHead className="px-4">Strategy</TableHead>
+                  <TableHead className="px-4 text-right">Fair Value / Price</TableHead>
+                  <TableHead className="px-4 text-right">Edge</TableHead>
+                  <TableHead className="px-4">Result</TableHead>
+                  <TableHead className="px-4 text-right">Trade P&L</TableHead>
+                  <TableHead className="px-4">Resolved</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {resolvedPredictions.map((prediction) => (
-                  <tr
-                    key={prediction.id}
-                    className="border-b border-border last:border-0 transition-colors hover:bg-accent/50"
-                  >
-                    <td className="px-4 py-3">
+                  <TableRow key={prediction.id}>
+                    <TableCell className="px-4">
                       <div className="max-w-[200px]">
                         <p className="truncate text-sm font-medium">
                           {prediction.market_title ?? prediction.ticker}
@@ -497,62 +412,50 @@ export default async function PredictionsPage() {
                           </p>
                         )}
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell className="px-4">
                       <CategoryPill category={prediction.event_category} />
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell className="px-4">
                       <SideBadge side={prediction.side} />
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell className="px-4">
                       <StrategyPill name={prediction.strategy_name} />
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">
+                    </TableCell>
+                    <TableCell className="px-4 text-right font-mono">
                       {(prediction.fair_value * 100).toFixed(0)}&cent;
                       {" / "}
                       {prediction.current_price != null
                         ? `${(prediction.current_price * 100).toFixed(0)}\u00a2`
                         : "\u2014"}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      <span
-                        className={
-                          prediction.edge >= 0
-                            ? "text-[color:var(--success)]"
-                            : "text-destructive"
-                        }
-                      >
-                        {(prediction.edge * 100).toFixed(1)}&cent;
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell className="px-4 text-right">
+                      <PnlValue
+                        value={prediction.edge * 100}
+                        size="sm"
+                        showSign={false}
+                        format={(v) => `${v.toFixed(1)}\u00a2`}
+                      />
+                    </TableCell>
+                    <TableCell className="px-4">
                       <StatusBadge status={prediction.status} />
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">
+                    </TableCell>
+                    <TableCell className="px-4 text-right">
                       {prediction.trade_pnl != null ? (
-                        <span
-                          className={
-                            prediction.trade_pnl >= 0
-                              ? "text-[color:var(--success)]"
-                              : "text-destructive"
-                          }
-                        >
-                          {prediction.trade_pnl >= 0 ? "+" : ""}
-                          {formatCurrency(prediction.trade_pnl)}
-                        </span>
+                        <PnlValue value={prediction.trade_pnl} size="sm" format={(v) => formatCurrency(v)} />
                       ) : (
                         <span className="text-muted-foreground">&mdash;</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                    </TableCell>
+                    <TableCell className="px-4 text-xs text-muted-foreground">
                       {prediction.resolved_at
                         ? formatDate(prediction.resolved_at)
                         : "\u2014"}
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
       </section>

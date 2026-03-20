@@ -10,6 +10,12 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
+import {
+  chartColors,
+  chartTooltipStyle,
+  chartAxisProps,
+  chartGridProps,
+} from "@/lib/chart-theme";
 
 interface EnrichedPrediction {
   id: string;
@@ -49,7 +55,7 @@ const BUCKET_MAX = 15;
 
 function getBucketLabel(lower: number): string {
   const sign = lower >= 0 ? "+" : "";
-  return `${sign}${lower}¢`;
+  return `${sign}${lower}\u00a2`;
 }
 
 export function EdgeDistributionChart({
@@ -62,9 +68,7 @@ export function EdgeDistributionChart({
           Edge Distribution
         </h3>
         <div className="flex h-64 items-center justify-center">
-          <p className="text-sm text-muted-foreground">
-            No predictions yet
-          </p>
+          <p className="text-sm text-muted-foreground">No predictions yet</p>
         </div>
       </div>
     );
@@ -108,48 +112,30 @@ export function EdgeDistributionChart({
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-            <XAxis
-              dataKey="bucket"
-              tick={{ fontSize: 11, fill: "#a1a1aa" }}
-              tickLine={false}
-              axisLine={{ stroke: "#27272a" }}
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: "#a1a1aa" }}
-              tickLine={false}
-              axisLine={{ stroke: "#27272a" }}
-              allowDecimals={false}
-            />
+            <CartesianGrid {...chartGridProps} />
+            <XAxis dataKey="bucket" {...chartAxisProps} />
+            <YAxis {...chartAxisProps} allowDecimals={false} />
             <Tooltip
-              contentStyle={{
-                backgroundColor: "#18181b",
-                border: "1px solid #27272a",
-                borderRadius: "8px",
-                fontSize: 12,
-              }}
-              labelStyle={{ color: "#a1a1aa" }}
+              contentStyle={chartTooltipStyle}
+              labelStyle={{ color: chartColors.tooltipLabel }}
             />
-            <Legend
-              wrapperStyle={{ fontSize: 11 }}
-              iconSize={10}
-            />
+            <Legend wrapperStyle={{ fontSize: 11 }} iconSize={10} />
             <Bar
               dataKey="correct"
               stackId="a"
-              fill="#22c55e"
+              fill={chartColors.success}
               name="Correct"
             />
             <Bar
               dataKey="incorrect"
               stackId="a"
-              fill="#ef4444"
+              fill={chartColors.destructive}
               name="Incorrect"
             />
             <Bar
               dataKey="pending"
               stackId="a"
-              fill="#71717a"
+              fill={chartColors.pending}
               name="Pending"
             />
           </BarChart>

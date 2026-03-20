@@ -8,16 +8,15 @@ import {
   Brain,
   ArrowLeftRight,
   Settings,
-  Menu,
-  X,
   Zap,
   ClipboardCheck,
   DollarSign,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 
-const navItems = [
+const mainNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/markets", label: "Markets", icon: TrendingUp },
   { href: "/dashboard/predictions", label: "Predictions", icon: Brain },
@@ -25,12 +24,29 @@ const navItems = [
   { href: "/dashboard/strategies", label: "Strategies", icon: Zap },
   { href: "/dashboard/pnl", label: "P&L", icon: DollarSign },
   { href: "/dashboard/reviews", label: "Reviews", icon: ClipboardCheck },
+];
+
+const bottomNav = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("sidebar-pinned");
+    if (saved === "true") setPinned(true);
+  }, []);
+
+  const togglePin = () => {
+    const next = !pinned;
+    setPinned(next);
+    localStorage.setItem("sidebar-pinned", String(next));
+  };
+
+  const expanded = pinned || hovered;
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -38,61 +54,108 @@ export function Sidebar() {
   };
 
   return (
-    <>
-      {/* Mobile toggle */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="fixed top-4 left-4 z-50 rounded-lg border border-border bg-card p-2 md:hidden"
-        aria-label="Toggle navigation"
-      >
-        {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-      </button>
-
-      {/* Overlay */}
-      {open && (
-        <div
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
-          onClick={() => setOpen(false)}
-        />
+    <aside
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className={cn(
+        "fixed inset-y-0 left-0 z-40 hidden flex-col border-r border-border bg-card transition-all duration-200 ease-out md:flex",
+        expanded ? "w-60" : "w-16"
       )}
+    >
+      {/* Brand */}
+      <div className="flex h-14 items-center gap-2 px-4">
+        <TrendingUp className="h-5 w-5 shrink-0 text-success" />
+        <span
+          className={cn(
+            "whitespace-nowrap text-sm font-semibold tracking-tight transition-opacity duration-200",
+            expanded ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
+          )}
+        >
+          Kalshi Edge
+        </span>
+      </div>
 
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-border bg-card transition-transform duration-200 md:translate-x-0",
-          open ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        <div className="flex h-16 items-center gap-2 border-b border-border px-6">
-          <TrendingUp className="h-6 w-6 text-primary" />
-          <span className="text-lg font-semibold tracking-tight">
-            Kalshi Assistant
-          </span>
-        </div>
+      <Separator />
 
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
+      {/* Main nav */}
+      <nav className="flex-1 space-y-0.5 px-2 py-3">
+        {mainNav.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                active
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              )}
+            >
+              {active && (
+                <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-success" />
+              )}
+              <Icon className="h-4 w-4 shrink-0" />
+              <span
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                  "whitespace-nowrap transition-opacity duration-200",
+                  expanded ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
                 )}
               >
-                <Icon className="h-4 w-4" />
                 {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-      </aside>
-    </>
+              </span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Bottom nav */}
+      <div className="px-2 pb-3">
+        <Separator className="mb-3" />
+        {bottomNav.map((item) => {
+          const Icon = item.icon;
+          const active = isActive(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                active
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              )}
+            >
+              {active && (
+                <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-success" />
+              )}
+              <Icon className="h-4 w-4 shrink-0" />
+              <span
+                className={cn(
+                  "whitespace-nowrap transition-opacity duration-200",
+                  expanded ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
+                )}
+              >
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+
+        {/* Pin toggle */}
+        {expanded && (
+          <button
+            onClick={togglePin}
+            className="mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span className="h-4 w-4 shrink-0 text-center text-[10px]">
+              {pinned ? "◀" : "▶"}
+            </span>
+            <span>{pinned ? "Collapse" : "Pin open"}</span>
+          </button>
+        )}
+      </div>
+    </aside>
   );
 }

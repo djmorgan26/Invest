@@ -10,6 +10,12 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { PriceSnapshot } from "@/lib/supabase/types";
+import {
+  chartColors,
+  chartTooltipStyle,
+  chartAxisProps,
+  chartGridProps,
+} from "@/lib/chart-theme";
 
 interface PriceChartProps {
   snapshots: PriceSnapshot[];
@@ -41,34 +47,22 @@ export function PriceChart({ snapshots = [] }: PriceChartProps) {
     <div className="h-64 w-full rounded-lg border border-border bg-card p-4">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-          <XAxis
-            dataKey="time"
-            tick={{ fontSize: 11, fill: "#a1a1aa" }}
-            tickLine={false}
-            axisLine={{ stroke: "#27272a" }}
-          />
+          <CartesianGrid {...chartGridProps} />
+          <XAxis dataKey="time" {...chartAxisProps} />
           <YAxis
             domain={[0, 100]}
-            tick={{ fontSize: 11, fill: "#a1a1aa" }}
-            tickLine={false}
-            axisLine={{ stroke: "#27272a" }}
+            {...chartAxisProps}
             tickFormatter={(v: number) => `${v}\u00a2`}
           />
           <Tooltip
-            contentStyle={{
-              backgroundColor: "#18181b",
-              border: "1px solid #27272a",
-              borderRadius: "8px",
-              fontSize: 12,
-            }}
-            labelStyle={{ color: "#a1a1aa" }}
+            contentStyle={chartTooltipStyle}
+            labelStyle={{ color: chartColors.tooltipLabel }}
             formatter={(value: number) => [`${value}\u00a2`, ""]}
           />
           <Line
             type="monotone"
             dataKey="price"
-            stroke="#e4e4e7"
+            stroke={chartColors.line}
             strokeWidth={2}
             dot={false}
             name="Last Price"
@@ -76,7 +70,7 @@ export function PriceChart({ snapshots = [] }: PriceChartProps) {
           <Line
             type="monotone"
             dataKey="bid"
-            stroke="#22c55e"
+            stroke={chartColors.bid}
             strokeWidth={1}
             dot={false}
             strokeDasharray="4 4"
@@ -85,7 +79,7 @@ export function PriceChart({ snapshots = [] }: PriceChartProps) {
           <Line
             type="monotone"
             dataKey="ask"
-            stroke="#ef4444"
+            stroke={chartColors.ask}
             strokeWidth={1}
             dot={false}
             strokeDasharray="4 4"

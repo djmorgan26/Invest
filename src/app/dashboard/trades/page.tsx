@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
-import { formatCurrency, formatDate } from "@/lib/utils";
-import { StatCard } from "@/components/ui/stat-card";
+import { formatCurrency } from "@/lib/utils";
+import { PnlValue } from "@/components/ui/pnl-value";
+import { TradeTabs } from "@/components/trades/trade-tabs";
+import type { EnrichedTrade } from "@/components/trades/trade-tabs";
 import type {
   PaperTrade,
   Market,
@@ -11,107 +12,6 @@ import type {
 } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
-
-// ── Helper Components ────────────────────────────────────────────────
-
-function SideBadge({ side }: { side: "yes" | "no" }) {
-  return (
-    <span
-      className={
-        side === "yes"
-          ? "rounded bg-[color:var(--success)]/15 px-2 py-0.5 text-xs font-medium text-[color:var(--success)]"
-          : "rounded bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive"
-      }
-    >
-      {side.toUpperCase()}
-    </span>
-  );
-}
-
-function CategoryPill({ category }: { category: string | null }) {
-  if (!category) return null;
-  return (
-    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-      {category}
-    </span>
-  );
-}
-
-function StrategyPill({ name }: { name: string | null }) {
-  if (!name) return null;
-  return (
-    <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-      {name}
-    </span>
-  );
-}
-
-function PriceBar({ entry, current }: { entry: number; current: number | null }) {
-  const entryPct = Math.min(Math.max(entry * 100, 0), 100);
-  const currentPct = current != null ? Math.min(Math.max(current * 100, 0), 100) : null;
-
-  return (
-    <div className="relative h-2 w-full rounded-full bg-secondary">
-      {currentPct != null && (
-        <div
-          className="absolute inset-y-0 left-0 rounded-full bg-primary/60"
-          style={{ width: `${currentPct}%` }}
-        />
-      )}
-      <div
-        className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2 rounded-full bg-foreground"
-        style={{ left: `${entryPct}%` }}
-        title={`Entry: ${entryPct.toFixed(0)}¢`}
-      />
-    </div>
-  );
-}
-
-function ResultBadge({ pnl, status }: { pnl: number | null; status: string }) {
-  if (status === "expired") {
-    return (
-      <span className="rounded bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
-        Expired
-      </span>
-    );
-  }
-  if (pnl == null) {
-    return (
-      <span className="rounded bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
-        —
-      </span>
-    );
-  }
-  if (pnl === 0) {
-    return (
-      <span className="rounded bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
-        Break Even
-      </span>
-    );
-  }
-  return pnl > 0 ? (
-    <span className="rounded bg-[color:var(--success)]/15 px-2 py-0.5 text-xs font-medium text-[color:var(--success)]">
-      Won
-    </span>
-  ) : (
-    <span className="rounded bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive">
-      Lost
-    </span>
-  );
-}
-
-// ── Types ────────────────────────────────────────────────────────────
-
-interface EnrichedTrade extends PaperTrade {
-  market_title: string | null;
-  event_category: string | null;
-  current_price: number | null;
-  close_time: string | null;
-  strategy_name: string | null;
-  prediction_reasoning: string | null;
-  prediction_confidence: number | null;
-  prediction_fair_value: number | null;
-}
 
 // ── Page ─────────────────────────────────────────────────────────────
 
@@ -255,325 +155,52 @@ export default async function TradesPage() {
         </p>
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Exposure"
-          value={formatCurrency(totalExposure)}
-          change={
-            openTrades.length > 0
-              ? {
-                  value: `${openTrades.length} open position${openTrades.length !== 1 ? "s" : ""}`,
-                  positive: true,
-                }
-              : undefined
-          }
-        />
-        <StatCard
-          title="Unrealized P&L"
-          value={formatCurrency(unrealizedPnl)}
-          change={
-            unrealizedPnl !== 0
-              ? {
-                  value: formatCurrency(Math.abs(unrealizedPnl)),
-                  positive: unrealizedPnl > 0,
-                }
-              : undefined
-          }
-        />
-        <StatCard
-          title="Realized P&L"
-          value={formatCurrency(realizedPnl)}
-          change={
-            resolvedCount > 0
-              ? {
-                  value: `${wins}W / ${losses}L`,
-                  positive: realizedPnl >= 0,
-                }
-              : undefined
-          }
-        />
-        <StatCard
-          title="Win Rate"
-          value={resolvedCount > 0 ? `${(winRate * 100).toFixed(1)}%` : "N/A"}
-          change={
-            resolvedCount > 0
-              ? {
-                  value: `${resolvedCount} resolved`,
-                  positive: winRate >= 0.5,
-                }
-              : undefined
-          }
-        />
-      </div>
-
-      {/* Open Positions — Card Grid */}
-      <section>
-        <h2 className="mb-4 text-lg font-semibold">
-          Open Positions
+      {/* Summary Stats — Compact Inline Pills */}
+      <div className="flex flex-wrap gap-3">
+        <div className="rounded-lg bg-secondary/50 px-4 py-2">
+          <p className="text-xs text-muted-foreground">Total Exposure</p>
+          <p className="font-mono text-sm font-medium">
+            {formatCurrency(totalExposure)}
+          </p>
           {openTrades.length > 0 && (
-            <span className="ml-2 rounded-full bg-secondary px-2.5 py-0.5 text-sm font-normal text-muted-foreground">
-              {openTrades.length}
-            </span>
-          )}
-        </h2>
-        {openTrades.length === 0 ? (
-          <div className="rounded-lg border border-border bg-card p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              No open positions. Trades are created automatically when
-              predictions have sufficient edge.
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {openTrades.map((trade) => {
-              const unrealized =
-                trade.current_price != null
-                  ? trade.side === "yes"
-                    ? (trade.current_price - trade.price) * trade.quantity
-                    : (trade.price - trade.current_price) * trade.quantity
-                  : null;
-
-              return (
-                <Link
-                  key={trade.id}
-                  href={`/dashboard/markets/${trade.ticker}`}
-                  className="group rounded-lg border border-border bg-card p-5 transition-colors hover:border-primary/40"
-                >
-                  {/* Top row: category + strategy pills */}
-                  <div className="flex items-center justify-between gap-2">
-                    <CategoryPill category={trade.event_category} />
-                    <StrategyPill name={trade.strategy_name} />
-                  </div>
-
-                  {/* Market title + side */}
-                  <div className="mt-3 flex items-start justify-between gap-3">
-                    <h3 className="text-sm font-medium leading-snug">
-                      {trade.market_title ?? trade.ticker}
-                    </h3>
-                    <SideBadge side={trade.side} />
-                  </div>
-
-                  {/* Metrics grid */}
-                  <div className="mt-4 grid grid-cols-4 gap-3 text-center">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Entry</p>
-                      <p className="mt-0.5 font-mono text-sm font-medium">
-                        {(trade.price * 100).toFixed(0)}&cent;
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Current</p>
-                      <p className="mt-0.5 font-mono text-sm font-medium">
-                        {trade.current_price != null
-                          ? `${(trade.current_price * 100).toFixed(0)}\u00a2`
-                          : "N/A"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Qty</p>
-                      <p className="mt-0.5 font-mono text-sm font-medium">
-                        {trade.quantity}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        Unrealized
-                      </p>
-                      <p
-                        className={`mt-0.5 font-mono text-sm font-medium ${
-                          unrealized == null
-                            ? ""
-                            : unrealized >= 0
-                              ? "text-[color:var(--success)]"
-                              : "text-destructive"
-                        }`}
-                      >
-                        {unrealized != null
-                          ? `${unrealized >= 0 ? "+" : ""}${formatCurrency(unrealized)}`
-                          : "N/A"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Price bar */}
-                  <div className="mt-4">
-                    <PriceBar
-                      entry={trade.price}
-                      current={trade.current_price}
-                    />
-                    <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
-                      <span>0¢</span>
-                      <span>
-                        {trade.current_price != null
-                          ? `${(trade.current_price * 100).toFixed(0)}/100`
-                          : "—"}
-                      </span>
-                      <span>100¢</span>
-                    </div>
-                  </div>
-
-                  {/* Footer: dates + reasoning */}
-                  <div className="mt-3 space-y-1">
-                    <p className="text-xs text-muted-foreground">
-                      {trade.close_time && (
-                        <>
-                          Closes{" "}
-                          {new Intl.DateTimeFormat("en-US", {
-                            month: "short",
-                            day: "numeric",
-                          }).format(new Date(trade.close_time))}
-                          {" \u00b7 "}
-                        </>
-                      )}
-                      Opened{" "}
-                      {new Intl.DateTimeFormat("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      }).format(new Date(trade.created_at))}
-                    </p>
-                    {trade.prediction_reasoning && (
-                      <p className="line-clamp-2 text-xs italic text-muted-foreground">
-                        &ldquo;{trade.prediction_reasoning}&rdquo;
-                      </p>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* Trade History — Enhanced Table */}
-      <section>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
-            Trade History
-            {closedTrades.length > 0 && (
-              <span className="ml-2 rounded-full bg-secondary px-2.5 py-0.5 text-sm font-normal text-muted-foreground">
-                {closedTrades.length}
-              </span>
-            )}
-          </h2>
-          {closedTrades.length > 0 && (
-            <p className="text-sm">
-              Total P&L:{" "}
-              <span
-                className={`font-mono font-medium ${
-                  realizedPnl >= 0
-                    ? "text-[color:var(--success)]"
-                    : "text-destructive"
-                }`}
-              >
-                {realizedPnl >= 0 ? "+" : ""}
-                {formatCurrency(realizedPnl)}
-              </span>
+            <p className="text-xs text-muted-foreground">
+              {openTrades.length} open position{openTrades.length !== 1 ? "s" : ""}
             </p>
           )}
         </div>
-        {closedTrades.length === 0 ? (
-          <div className="rounded-lg border border-border bg-card p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              No completed trades yet.
+        <div className="rounded-lg bg-secondary/50 px-4 py-2">
+          <p className="text-xs text-muted-foreground">Unrealized P&L</p>
+          <PnlValue value={unrealizedPnl} size="sm" />
+        </div>
+        <div className="rounded-lg bg-secondary/50 px-4 py-2">
+          <p className="text-xs text-muted-foreground">Realized P&L</p>
+          <PnlValue value={realizedPnl} size="sm" />
+          {resolvedCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {wins}W / {losses}L
             </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-card text-left">
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Market
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Category
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Side
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Strategy
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">
-                    Entry / Exit
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">
-                    P&L
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Result
-                  </th>
-                  <th className="px-4 py-3 font-medium text-muted-foreground">
-                    Closed
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {closedTrades.map((trade) => (
-                  <tr
-                    key={trade.id}
-                    className="border-b border-border last:border-0 hover:bg-accent/50 transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="max-w-[200px]">
-                        <p className="truncate text-sm font-medium">
-                          {trade.market_title ?? trade.ticker}
-                        </p>
-                        {trade.market_title && (
-                          <p className="truncate font-mono text-xs text-muted-foreground">
-                            {trade.ticker}
-                          </p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <CategoryPill category={trade.event_category} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <SideBadge side={trade.side} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <StrategyPill name={trade.strategy_name} />
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      {(trade.price * 100).toFixed(0)}&cent;
-                      {" / "}
-                      {trade.exit_price != null
-                        ? `${(trade.exit_price * 100).toFixed(0)}\u00a2`
-                        : "\u2014"}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      {trade.pnl != null ? (
-                        <span
-                          className={
-                            trade.pnl >= 0
-                              ? "text-[color:var(--success)]"
-                              : "text-destructive"
-                          }
-                        >
-                          {trade.pnl >= 0 ? "+" : ""}
-                          {formatCurrency(trade.pnl)}
-                        </span>
-                      ) : (
-                        "\u2014"
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <ResultBadge pnl={trade.pnl} status={trade.status} />
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {trade.closed_at
-                        ? formatDate(trade.closed_at)
-                        : "\u2014"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+          )}
+        </div>
+        <div className="rounded-lg bg-secondary/50 px-4 py-2">
+          <p className="text-xs text-muted-foreground">Win Rate</p>
+          <p className="font-mono text-sm font-medium">
+            {resolvedCount > 0 ? `${(winRate * 100).toFixed(1)}%` : "N/A"}
+          </p>
+          {resolvedCount > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {resolvedCount} resolved
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Tabbed Trade Views */}
+      <TradeTabs
+        enrichedTrades={enrichedTrades}
+        openTrades={openTrades}
+        closedTrades={closedTrades}
+        realizedPnl={realizedPnl}
+      />
     </div>
   );
 }

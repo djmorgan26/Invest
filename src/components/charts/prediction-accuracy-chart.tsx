@@ -9,6 +9,12 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import {
+  chartColors,
+  chartTooltipStyle,
+  chartAxisProps,
+  chartGridProps,
+} from "@/lib/chart-theme";
 
 interface EnrichedPrediction {
   id: string;
@@ -65,7 +71,8 @@ export function PredictionAccuracyChart({
     )
     .sort(
       (a, b) =>
-        new Date(a.resolved_at!).getTime() - new Date(b.resolved_at!).getTime()
+        new Date(a.resolved_at!).getTime() -
+        new Date(b.resolved_at!).getTime()
     );
 
   if (resolved.length === 0) {
@@ -105,7 +112,8 @@ export function PredictionAccuracyChart({
       const total = counts.correct + counts.incorrect;
       return {
         date: formatDate(week),
-        accuracy: total > 0 ? Math.round((counts.correct / total) * 100) : 0,
+        accuracy:
+          total > 0 ? Math.round((counts.correct / total) * 100) : 0,
         correct: counts.correct,
         incorrect: counts.incorrect,
         total,
@@ -128,57 +136,54 @@ export function PredictionAccuracyChart({
                 x2="0"
                 y2="1"
               >
-                <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
+                <stop
+                  offset="5%"
+                  stopColor={chartColors.success}
+                  stopOpacity={0.3}
+                />
+                <stop
+                  offset="95%"
+                  stopColor={chartColors.success}
+                  stopOpacity={0}
+                />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 11, fill: "#a1a1aa" }}
-              tickLine={false}
-              axisLine={{ stroke: "#27272a" }}
-            />
+            <CartesianGrid {...chartGridProps} />
+            <XAxis dataKey="date" {...chartAxisProps} />
             <YAxis
               domain={[0, 100]}
-              tick={{ fontSize: 11, fill: "#a1a1aa" }}
-              tickLine={false}
-              axisLine={{ stroke: "#27272a" }}
+              {...chartAxisProps}
               tickFormatter={(v: number) => `${v}%`}
             />
             <Tooltip
-              contentStyle={{
-                backgroundColor: "#18181b",
-                border: "1px solid #27272a",
-                borderRadius: "8px",
-                fontSize: 12,
-              }}
-              labelStyle={{ color: "#a1a1aa" }}
-              formatter={(value: number, name: string) => {
-                if (name === "accuracy") return [`${value}%`, "Accuracy"];
-                return [value, name];
-              }}
               content={({ active, payload, label }) => {
-                if (!active || !payload || payload.length === 0) return null;
+                if (!active || !payload || payload.length === 0)
+                  return null;
                 const d = payload[0].payload as AccuracyBucket;
                 return (
                   <div
                     style={{
-                      backgroundColor: "#18181b",
-                      border: "1px solid #27272a",
-                      borderRadius: "8px",
-                      fontSize: 12,
+                      ...chartTooltipStyle,
                       padding: "8px 12px",
                     }}
                   >
-                    <p style={{ color: "#a1a1aa", marginBottom: 4 }}>{label}</p>
-                    <p style={{ color: "#22c55e" }}>
+                    <p
+                      style={{
+                        color: chartColors.tooltipLabel,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {label}
+                    </p>
+                    <p style={{ color: chartColors.success }}>
                       Accuracy: {d.accuracy}%
                     </p>
-                    <p style={{ color: "#e4e4e7" }}>
+                    <p style={{ color: chartColors.tooltipText }}>
                       Correct: {d.correct} | Incorrect: {d.incorrect}
                     </p>
-                    <p style={{ color: "#a1a1aa" }}>Total: {d.total}</p>
+                    <p style={{ color: chartColors.tooltipLabel }}>
+                      Total: {d.total}
+                    </p>
                   </div>
                 );
               }}
@@ -186,7 +191,7 @@ export function PredictionAccuracyChart({
             <Area
               type="monotone"
               dataKey="accuracy"
-              stroke="#22c55e"
+              stroke={chartColors.success}
               strokeWidth={2}
               fill="url(#accuracyGradient)"
             />

@@ -1,6 +1,13 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { formatCurrency, formatPercent, formatDate } from "@/lib/utils";
-import { StatCard } from "@/components/ui/stat-card";
+import { parseTicker } from "@/lib/ticker-utils";
+import { PnlValue } from "@/components/ui/pnl-value";
+import { SideBadge } from "@/components/ui/side-badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { HeroChart } from "@/components/dashboard/hero-chart";
+import { PositionCard } from "@/components/dashboard/position-card";
+import { StrategyMiniCard } from "@/components/dashboard/strategy-mini-card";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import type { Prediction } from "@/lib/supabase/types";
 
 export const dynamic = "force-dynamic";
@@ -8,38 +15,62 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const supabase = createServerClient();
 
-  const [portfolioRes, openTradesRes, predictionsRes, recentPredictionsRes, strategiesRes, strategyTradesRes] =
-    await Promise.all([
-      supabase
-        .from("portfolio_snapshots")
-        .select("*")
-        .order("snapshot_at", { ascending: false })
-        .limit(1)
-        .single(),
-      supabase
-        .from("paper_trades")
-        .select("*", { count: "exact", head: true })
-        .eq("status", "open"),
-      supabase
-        .from("predictions")
-        .select("status")
-        .in("status", ["correct", "incorrect"]),
-      supabase
-        .from("predictions")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(5),
-      supabase
-        .from("strategies")
-        .select("id, name, enabled"),
-      supabase
-        .from("paper_trades")
-        .select("strategy_id, status, pnl")
-        .eq("status", "closed"),
-    ]);
+  const [
+    portfolioRes,
+    portfolioHistoryRes,
+    openTradesRes,
+    openTradeDataRes,
+    predictionsRes,
+    recentPredictionsRes,
+    strategiesRes,
+    strategyTradesRes,
+    marketsRes,
+  ] = await Promise.all([
+    supabase
+      .from("portfolio_snapshots")
+      .select("*")
+      .order("snapshot_at", { ascending: false })
+      .limit(1)
+      .single(),
+    supabase
+      .from("portfolio_snapshots")
+      .select("snapshot_at, total_value")
+      .order("snapshot_at", { ascending: true })
+      .limit(200),
+    supabase
+      .from("paper_trades")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "open"),
+    supabase
+      .from("paper_trades")
+      .select("id, ticker, side, quantity, price, cost, strategy_id")
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("predictions")
+      .select("status")
+      .in("status", ["correct", "incorrect"]),
+    supabase
+      .from("predictions")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5),
+    supabase.from("strategies").select("id, name, enabled"),
+    supabase
+      .from("paper_trades")
+      .select("strategy_id, status, pnl")
+      .eq("status", "closed"),
+    supabase
+      .from("markets")
+      .select("ticker, title, last_price, close_time, event_ticker")
+      .limit(5000),
+  ]);
 
   const portfolio = portfolioRes.data;
+  const portfolioHistory = portfolioHistoryRes.data ?? [];
   const openTradesCount = openTradesRes.count ?? 0;
+  const openTradeData = openTradeDataRes.data ?? [];
   const resolvedPredictions = predictionsRes.data ?? [];
   const correctCount = resolvedPredictions.filter(
     (p) => p.status === "correct"
@@ -50,6 +81,24 @@ export default async function DashboardPage() {
 
   const strategies = strategiesRes.data ?? [];
   const strategyTrades = strategyTradesRes.data ?? [];
+  const allMarkets = marketsRes.data ?? [];
+  const marketMap = new Map(allMarkets.map((m) => [m.ticker, m]));
+  const strategyMap = new Map(strategies.map((s) => [s.id, s]));
+
+  // Fetch events for categories
+  const eventTickers = [
+    ...new Set(allMarkets.map((m) => m.event_ticker).filter(Boolean)),
+  ];
+  const eventsRes =
+    eventTickers.length > 0
+      ? await supabase
+          .from("events")
+          .select("event_ticker, title, category")
+          .in("event_ticker", eventTickers)
+      : { data: [] };
+  const eventMap = new Map(
+    (eventsRes.data ?? []).map((e) => [e.event_ticker, e])
+  );
 
   const strategyStats = strategies.map((s) => {
     const closed = strategyTrades.filter((t) => t.strategy_id === s.id);
@@ -66,183 +115,234 @@ export default async function DashboardPage() {
     };
   });
 
+  const totalPnl = portfolio ? portfolio.total_value - 10000 : 0;
+
+  // Enrich open positions with market, event, and strategy data
+  const enrichedOpen = openTradeData.map((t) => {
+    const market = marketMap.get(t.ticker);
+    const event = market?.event_ticker
+      ? eventMap.get(market.event_ticker)
+      : null;
+    const strategy = t.strategy_id
+      ? strategyMap.get(t.strategy_id)
+      : null;
+    const currentPrice =
+      market?.last_price != null ? market.last_price / 100 : null;
+    const unrealized =
+      currentPrice != null
+        ? t.side === "yes"
+          ? (currentPrice - t.price) * t.quantity
+          : (t.price - currentPrice) * t.quantity
+        : null;
+    return {
+      ...t,
+      title: market?.title ?? null,
+      currentPrice,
+      unrealized,
+      category: event?.category ?? null,
+      closeTime: market?.close_time ?? null,
+      strategyName: strategy?.name ?? null,
+    };
+  });
+
+  // Enrich recent predictions with market titles
+  const enrichedPredictions = recentPredictions.map((pred) => {
+    const market = marketMap.get(pred.ticker);
+    const event = market?.event_ticker
+      ? eventMap.get(market.event_ticker)
+      : null;
+    return {
+      ...pred,
+      marketTitle: market?.title ?? null,
+      category: event?.category ?? null,
+    };
+  });
+
   const hasData = portfolio !== null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Hero: Portfolio value + change */}
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Portfolio overview and recent activity
-        </p>
+        <p className="text-sm text-muted-foreground">Portfolio Value</p>
+        <div className="mt-1 flex items-baseline gap-3">
+          <span className="text-5xl font-bold font-mono tracking-tight">
+            {hasData
+              ? formatCurrency(portfolio.total_value)
+              : "$10,000.00"}
+          </span>
+          {hasData && totalPnl !== 0 && (
+            <PnlValue value={totalPnl} size="lg" format={formatCurrency} />
+          )}
+        </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Value"
-          value={hasData ? formatCurrency(portfolio.total_value) : "$10,000.00"}
+      {/* Hero chart */}
+      <HeroChart snapshots={portfolioHistory} />
+
+      {/* Quick stats row */}
+      <div className="flex flex-wrap gap-4">
+        <QuickStat
+          label="Win Rate"
+          value={totalResolved > 0 ? formatPercent(winRate) : "N/A"}
         />
-        <StatCard
-          title="Cash"
+        <QuickStat label="Open Trades" value={openTradesCount.toString()} />
+        <QuickStat
+          label="Unrealized"
+          value={
+            hasData
+              ? formatCurrency(portfolio.unrealized_pnl)
+              : "$0.00"
+          }
+          pnl={hasData ? portfolio.unrealized_pnl : 0}
+        />
+        <QuickStat
+          label="Cash"
           value={hasData ? formatCurrency(portfolio.cash) : "$10,000.00"}
         />
-        <StatCard
-          title="Unrealized P&L"
-          value={
-            hasData ? formatCurrency(portfolio.unrealized_pnl) : "$0.00"
-          }
-          change={
-            hasData && portfolio.unrealized_pnl !== 0
-              ? {
-                  value: formatCurrency(portfolio.unrealized_pnl),
-                  positive: portfolio.unrealized_pnl > 0,
-                }
-              : undefined
-          }
-        />
-        <StatCard
-          title="Win Rate"
-          value={
-            totalResolved > 0
-              ? formatPercent(winRate)
-              : "N/A"
-          }
-          change={
-            totalResolved > 0
-              ? {
-                  value: `${correctCount}/${totalResolved} resolved`,
-                  positive: winRate >= 0.5,
-                }
-              : undefined
-          }
-        />
       </div>
 
-      {/* Recent Predictions & Open Positions */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent Predictions */}
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-lg font-semibold">Recent Predictions</h2>
-          {recentPredictions.length === 0 ? (
-            <p className="mt-4 text-sm text-muted-foreground">
-              No predictions yet. Run the prediction pipeline to generate
-              analysis.
-            </p>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {recentPredictions.map((pred) => (
+      {/* Active positions strip */}
+      {enrichedOpen.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+            Open Positions
+          </h2>
+          <ScrollArea className="w-full">
+            <div className="flex gap-3 pb-2">
+              {enrichedOpen.map((trade) => (
+                <PositionCard
+                  key={trade.id}
+                  ticker={trade.ticker}
+                  title={trade.title}
+                  side={trade.side}
+                  entryPrice={trade.price}
+                  currentPrice={trade.currentPrice}
+                  quantity={trade.quantity}
+                  unrealizedPnl={trade.unrealized}
+                  category={trade.category}
+                  closeTime={trade.closeTime}
+                  cost={trade.cost}
+                  strategyName={trade.strategyName}
+                />
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        </section>
+      )}
+
+      {/* Strategy performance mini cards */}
+      {strategies.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+            Strategies
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {strategyStats.map((s) => (
+              <StrategyMiniCard
+                key={s.id}
+                name={s.name}
+                enabled={s.enabled}
+                trades={s.trades}
+                winRate={s.win_rate}
+                pnl={s.pnl}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Recent predictions — enriched with market titles */}
+      {enrichedPredictions.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-sm font-medium text-muted-foreground">
+            Recent Predictions
+          </h2>
+          <div className="space-y-2">
+            {enrichedPredictions.map((pred) => {
+              const parsed = parseTicker(pred.ticker);
+              const displayTitle =
+                pred.marketTitle &&
+                pred.marketTitle !== pred.ticker &&
+                !pred.marketTitle.startsWith("KX")
+                  ? pred.marketTitle
+                  : parsed.summary;
+
+              return (
                 <div
                   key={pred.id}
-                  className="flex items-center justify-between rounded-lg border border-border px-4 py-3"
+                  className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card px-4 py-3 transition-colors hover:bg-card-hover"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-sm">{pred.ticker}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {formatDate(pred.created_at)}
+                    <p className="truncate text-sm font-medium">
+                      {displayTitle}
                     </p>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      {pred.category && (
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                          {pred.category}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(pred.created_at)}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span
-                      className={
-                        pred.side === "yes"
-                          ? "rounded bg-[color:var(--success)]/15 px-2 py-0.5 text-xs font-medium text-[color:var(--success)]"
-                          : "rounded bg-destructive/15 px-2 py-0.5 text-xs font-medium text-destructive"
-                      }
-                    >
-                      {pred.side.toUpperCase()}
-                    </span>
+                    <SideBadge side={pred.side} />
                     <span className="font-mono text-sm">
                       {formatPercent(pred.confidence)}
                     </span>
                     <StatusBadge status={pred.status} />
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Open Positions */}
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-lg font-semibold">Open Positions</h2>
-          {openTradesCount === 0 ? (
-            <p className="mt-4 text-sm text-muted-foreground">
-              No open positions. Predictions with sufficient edge will trigger
-              paper trades automatically.
-            </p>
-          ) : (
-            <p className="mt-4 text-sm text-muted-foreground">
-              <span className="font-mono text-2xl font-semibold text-foreground">
-                {openTradesCount}
-              </span>{" "}
-              open position{openTradesCount !== 1 ? "s" : ""}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Strategy Performance Summary */}
-      {strategies.length > 0 && (
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="text-lg font-semibold">Strategy Performance</h2>
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-muted-foreground">
-                  <th className="pb-2 pr-4 font-medium">Strategy</th>
-                  <th className="pb-2 pr-4 font-medium text-right">Trades</th>
-                  <th className="pb-2 pr-4 font-medium text-right">Win Rate</th>
-                  <th className="pb-2 font-medium text-right">P&L</th>
-                </tr>
-              </thead>
-              <tbody>
-                {strategyStats.map((s) => (
-                  <tr key={s.id} className="border-b border-border last:border-0">
-                    <td className="py-2 pr-4">
-                      <span className="font-medium">{s.name}</span>
-                      {!s.enabled && (
-                        <span className="ml-2 text-xs text-muted-foreground">(disabled)</span>
-                      )}
-                    </td>
-                    <td className="py-2 pr-4 text-right font-mono">{s.trades}</td>
-                    <td className="py-2 pr-4 text-right font-mono">
-                      {s.win_rate !== null ? formatPercent(s.win_rate) : "—"}
-                    </td>
-                    <td className={`py-2 text-right font-mono ${
-                      s.pnl > 0 ? "text-[color:var(--success)]" : s.pnl < 0 ? "text-destructive" : ""
-                    }`}>
-                      {s.trades > 0 ? formatCurrency(s.pnl) : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              );
+            })}
           </div>
-        </div>
+        </section>
       )}
 
       {!hasData && strategies.length === 0 && (
-        <div className="rounded-lg border border-border bg-card p-8 text-center">
-          <p className="text-muted-foreground">
-            No portfolio data yet. Run{" "}
-            <code className="rounded bg-secondary px-1.5 py-0.5 font-mono text-sm">
-              sync-markets
-            </code>{" "}
-            to get started.
-          </p>
-        </div>
+        <EmptyState message="No portfolio data yet. Run sync-markets to get started." />
       )}
+    </div>
+  );
+}
+
+function QuickStat({
+  label,
+  value,
+  pnl,
+}: {
+  label: string;
+  value: string;
+  pnl?: number;
+}) {
+  return (
+    <div className="rounded-lg bg-secondary/50 px-4 py-2">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className={`font-mono text-sm font-semibold ${
+          pnl != null && pnl > 0
+            ? "text-success"
+            : pnl != null && pnl < 0
+              ? "text-destructive"
+              : ""
+        }`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    pending:
-      "bg-[color:var(--warning)]/15 text-[color:var(--warning)]",
-    correct:
-      "bg-[color:var(--success)]/15 text-[color:var(--success)]",
+    pending: "bg-warning/15 text-warning",
+    correct: "bg-success/15 text-success",
     incorrect: "bg-destructive/15 text-destructive",
     expired: "bg-secondary text-muted-foreground",
   };

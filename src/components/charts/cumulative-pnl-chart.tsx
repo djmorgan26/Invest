@@ -10,6 +10,12 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
+import {
+  chartColors,
+  chartTooltipStyle,
+  chartAxisProps,
+  chartGridProps,
+} from "@/lib/chart-theme";
 
 interface EnrichedPrediction {
   id: string;
@@ -64,7 +70,6 @@ function formatDollar(value: number): string {
 
 export function CumulativePnlChart({
   predictions,
-  trades,
 }: CumulativePnlChartProps) {
   const withPnl = predictions
     .filter((p) => p.trade_pnl !== null && p.resolved_at !== null)
@@ -98,7 +103,8 @@ export function CumulativePnlChart({
   });
 
   const finalPnl = data[data.length - 1]?.pnl ?? 0;
-  const lineColor = finalPnl >= 0 ? "#22c55e" : "#ef4444";
+  const lineColor =
+    finalPnl >= 0 ? chartColors.success : chartColors.destructive;
   const gradientId = "cumulativePnlGradient";
 
   return (
@@ -115,30 +121,22 @@ export function CumulativePnlChart({
                 <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 11, fill: "#a1a1aa" }}
-              tickLine={false}
-              axisLine={{ stroke: "#27272a" }}
-            />
+            <CartesianGrid {...chartGridProps} />
+            <XAxis dataKey="date" {...chartAxisProps} />
             <YAxis
-              tick={{ fontSize: 11, fill: "#a1a1aa" }}
-              tickLine={false}
-              axisLine={{ stroke: "#27272a" }}
+              {...chartAxisProps}
               tickFormatter={(v: number) => `$${v}`}
             />
             <Tooltip
-              contentStyle={{
-                backgroundColor: "#18181b",
-                border: "1px solid #27272a",
-                borderRadius: "8px",
-                fontSize: 12,
-              }}
-              labelStyle={{ color: "#a1a1aa" }}
+              contentStyle={chartTooltipStyle}
+              labelStyle={{ color: chartColors.tooltipLabel }}
               formatter={(value: number) => [formatDollar(value), "P&L"]}
             />
-            <ReferenceLine y={0} stroke="#27272a" strokeDasharray="3 3" />
+            <ReferenceLine
+              y={0}
+              stroke={chartColors.grid}
+              strokeDasharray="3 3"
+            />
             <Area
               type="monotone"
               dataKey="pnl"

@@ -3,7 +3,15 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import type { Market } from "@/lib/supabase/types";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface MarketTableProps {
   markets: Market[];
@@ -70,6 +78,12 @@ export function MarketTable({ markets }: MarketTableProps) {
     return sortDir === "asc" ? " \u2191" : " \u2193";
   };
 
+  // Max volume for heat indicator
+  const maxVolume = useMemo(
+    () => Math.max(1, ...markets.map((m) => m.volume ?? 0)),
+    [markets]
+  );
+
   return (
     <div className="space-y-4">
       <input
@@ -81,107 +95,112 @@ export function MarketTable({ markets }: MarketTableProps) {
       />
 
       <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-card text-left">
-              <th
-                className="cursor-pointer px-4 py-3 font-medium text-muted-foreground hover:text-foreground"
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead
+                className="cursor-pointer hover:text-foreground"
                 onClick={() => toggleSort("ticker")}
               >
                 Ticker{sortIndicator("ticker")}
-              </th>
-              <th className="px-4 py-3 font-medium text-muted-foreground">
-                Title
-              </th>
-              <th
-                className="cursor-pointer px-4 py-3 text-right font-medium text-muted-foreground hover:text-foreground"
+              </TableHead>
+              <TableHead>Title</TableHead>
+              <TableHead
+                className="cursor-pointer text-right hover:text-foreground"
                 onClick={() => toggleSort("last_price")}
               >
                 Last Price{sortIndicator("last_price")}
-              </th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">
-                Yes Bid/Ask
-              </th>
-              <th
-                className="cursor-pointer px-4 py-3 text-right font-medium text-muted-foreground hover:text-foreground"
+              </TableHead>
+              <TableHead className="text-right">Yes Bid/Ask</TableHead>
+              <TableHead
+                className="cursor-pointer text-right hover:text-foreground"
                 onClick={() => toggleSort("volume")}
               >
                 Volume{sortIndicator("volume")}
-              </th>
-              <th
-                className="cursor-pointer px-4 py-3 text-right font-medium text-muted-foreground hover:text-foreground"
+              </TableHead>
+              <TableHead
+                className="cursor-pointer text-right hover:text-foreground"
                 onClick={() => toggleSort("close_time")}
               >
                 Close Time{sortIndicator("close_time")}
-              </th>
-              <th className="px-4 py-3 text-right font-medium text-muted-foreground">
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody>
+              </TableHead>
+              <TableHead className="text-right">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {filtered.length === 0 ? (
-              <tr>
-                <td
+              <TableRow>
+                <TableCell
                   colSpan={7}
-                  className="px-4 py-8 text-center text-muted-foreground"
+                  className="py-8 text-center text-muted-foreground"
                 >
                   {markets.length === 0
                     ? "No markets found. Run sync-markets to fetch data."
                     : "No markets match your search."}
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
-              filtered.map((market) => (
-                <tr
-                  key={market.ticker}
-                  className="border-b border-border last:border-0 hover:bg-accent/50 transition-colors"
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/dashboard/markets/${market.ticker}`}
-                      className="font-mono text-sm font-medium text-primary hover:underline"
-                    >
-                      {market.ticker}
-                    </Link>
-                  </td>
-                  <td className="max-w-xs truncate px-4 py-3">
-                    {market.title}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {market.last_price != null
-                      ? `${market.last_price}\u00a2`
-                      : "\u2014"}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {market.yes_bid != null && market.yes_ask != null
-                      ? `${market.yes_bid}\u00a2 / ${market.yes_ask}\u00a2`
-                      : "\u2014"}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {market.volume?.toLocaleString() ?? "\u2014"}
-                  </td>
-                  <td className="px-4 py-3 text-right text-xs text-muted-foreground">
-                    {market.close_time
-                      ? formatDate(market.close_time)
-                      : "\u2014"}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span
-                      className={`rounded px-2 py-0.5 text-xs font-medium ${
-                        market.status === "open"
-                          ? "bg-success/15 text-success"
-                          : "bg-secondary text-muted-foreground"
-                      }`}
-                    >
-                      {market.status}
-                    </span>
-                  </td>
-                </tr>
-              ))
+              filtered.map((market) => {
+                const heat =
+                  market.volume != null ? market.volume / maxVolume : 0;
+                return (
+                  <TableRow
+                    key={market.ticker}
+                    className="transition-colors hover:bg-card-hover"
+                    style={
+                      heat > 0.1
+                        ? {
+                            background: `rgba(var(--success-rgb, 34 197 94), ${heat * 0.04})`,
+                          }
+                        : undefined
+                    }
+                  >
+                    <TableCell>
+                      <Link
+                        href={`/dashboard/markets/${market.ticker}`}
+                        className="font-mono text-sm font-medium text-primary hover:underline"
+                      >
+                        {market.ticker}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate">
+                      {market.title}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {market.last_price != null
+                        ? `${market.last_price}\u00a2`
+                        : "\u2014"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {market.yes_bid != null && market.yes_ask != null
+                        ? `${market.yes_bid}\u00a2 / ${market.yes_ask}\u00a2`
+                        : "\u2014"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {market.volume?.toLocaleString() ?? "\u2014"}
+                    </TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground">
+                      {market.close_time
+                        ? formatDate(market.close_time)
+                        : "\u2014"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span
+                        className={`rounded px-2 py-0.5 text-xs font-medium ${
+                          market.status === "open"
+                            ? "bg-success/15 text-success"
+                            : "bg-secondary text-muted-foreground"
+                        }`}
+                      >
+                        {market.status}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       <p className="text-xs text-muted-foreground">

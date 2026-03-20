@@ -10,6 +10,12 @@ import {
   CartesianGrid,
   Cell,
 } from "recharts";
+import {
+  chartColors,
+  chartTooltipStyle,
+  chartAxisProps,
+  chartGridProps,
+} from "@/lib/chart-theme";
 
 interface EnrichedPrediction {
   id: string;
@@ -54,9 +60,7 @@ export function StrategyComparisonChart({
           Strategy Comparison
         </h3>
         <div className="flex h-64 items-center justify-center">
-          <p className="text-sm text-muted-foreground">
-            No predictions yet
-          </p>
+          <p className="text-sm text-muted-foreground">No predictions yet</p>
         </div>
       </div>
     );
@@ -127,60 +131,58 @@ export function StrategyComparisonChart({
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} layout="vertical" margin={{ left: 20 }}>
             <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="#27272a"
+              {...chartGridProps}
               horizontal={false}
             />
             <XAxis
               type="number"
               domain={[0, 100]}
-              tick={{ fontSize: 11, fill: "#a1a1aa" }}
-              tickLine={false}
-              axisLine={{ stroke: "#27272a" }}
+              {...chartAxisProps}
               tickFormatter={(v: number) => `${v}%`}
             />
             <YAxis
               type="category"
               dataKey="strategy"
-              tick={{ fontSize: 11, fill: "#a1a1aa" }}
-              tickLine={false}
-              axisLine={{ stroke: "#27272a" }}
+              {...chartAxisProps}
               width={100}
             />
             <Tooltip
-              contentStyle={{
-                backgroundColor: "#18181b",
-                border: "1px solid #27272a",
-                borderRadius: "8px",
-                fontSize: 12,
-              }}
-              labelStyle={{ color: "#a1a1aa" }}
               content={({ active, payload }) => {
                 if (!active || !payload || payload.length === 0) return null;
                 const d = payload[0].payload as StrategyData;
                 return (
                   <div
                     style={{
-                      backgroundColor: "#18181b",
-                      border: "1px solid #27272a",
-                      borderRadius: "8px",
-                      fontSize: 12,
+                      ...chartTooltipStyle,
                       padding: "8px 12px",
                     }}
                   >
-                    <p style={{ color: "#e4e4e7", fontWeight: 600, marginBottom: 4 }}>
+                    <p
+                      style={{
+                        color: chartColors.tooltipText,
+                        fontWeight: 600,
+                        marginBottom: 4,
+                      }}
+                    >
                       {d.strategy}
                     </p>
-                    <p style={{ color: d.accuracy > 50 ? "#22c55e" : "#ef4444" }}>
+                    <p
+                      style={{
+                        color:
+                          d.accuracy > 50
+                            ? chartColors.success
+                            : chartColors.destructive,
+                      }}
+                    >
                       Accuracy: {d.accuracy}%
                     </p>
-                    <p style={{ color: "#e4e4e7" }}>
-                      Avg Edge: {d.avgEdge}¢
+                    <p style={{ color: chartColors.tooltipText }}>
+                      Avg Edge: {d.avgEdge}&cent;
                     </p>
-                    <p style={{ color: "#a1a1aa" }}>
+                    <p style={{ color: chartColors.tooltipLabel }}>
                       Predictions: {d.predictions}
                     </p>
-                    <p style={{ color: "#a1a1aa" }}>
+                    <p style={{ color: chartColors.tooltipLabel }}>
                       Trades: {d.trades}
                     </p>
                   </div>
@@ -191,7 +193,11 @@ export function StrategyComparisonChart({
               {data.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={entry.accuracy > 50 ? "#22c55e" : "#ef4444"}
+                  fill={
+                    entry.accuracy > 50
+                      ? chartColors.success
+                      : chartColors.destructive
+                  }
                 />
               ))}
             </Bar>

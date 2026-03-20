@@ -10,6 +10,12 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { PortfolioSnapshot } from "@/lib/supabase/types";
+import {
+  chartColors,
+  chartTooltipStyle,
+  chartAxisProps,
+  chartGridProps,
+} from "@/lib/chart-theme";
 
 interface PnlChartProps {
   snapshots: PortfolioSnapshot[];
@@ -40,31 +46,19 @@ export function PnlChart({ snapshots = [] }: PnlChartProps) {
         <AreaChart data={data}>
           <defs>
             <linearGradient id="valueGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#a1a1aa" stopOpacity={0.3} />
-              <stop offset="95%" stopColor="#a1a1aa" stopOpacity={0} />
+              <stop offset="5%" stopColor={chartColors.axisText} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={chartColors.axisText} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-          <XAxis
-            dataKey="time"
-            tick={{ fontSize: 11, fill: "#a1a1aa" }}
-            tickLine={false}
-            axisLine={{ stroke: "#27272a" }}
-          />
+          <CartesianGrid {...chartGridProps} />
+          <XAxis dataKey="time" {...chartAxisProps} />
           <YAxis
-            tick={{ fontSize: 11, fill: "#a1a1aa" }}
-            tickLine={false}
-            axisLine={{ stroke: "#27272a" }}
+            {...chartAxisProps}
             tickFormatter={(v: number) => `$${v.toLocaleString()}`}
           />
           <Tooltip
-            contentStyle={{
-              backgroundColor: "#18181b",
-              border: "1px solid #27272a",
-              borderRadius: "8px",
-              fontSize: 12,
-            }}
-            labelStyle={{ color: "#a1a1aa" }}
+            contentStyle={chartTooltipStyle}
+            labelStyle={{ color: chartColors.tooltipLabel }}
             formatter={(value: number) => [
               `$${value.toLocaleString()}`,
               "Portfolio Value",
@@ -73,7 +67,7 @@ export function PnlChart({ snapshots = [] }: PnlChartProps) {
           <Area
             type="monotone"
             dataKey="value"
-            stroke="#e4e4e7"
+            stroke={chartColors.line}
             strokeWidth={2}
             fill="url(#valueGradient)"
           />
