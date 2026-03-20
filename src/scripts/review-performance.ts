@@ -79,7 +79,59 @@ async function main() {
     }
     report.strategies = strategyPerf;
 
-    // 3. Recent learnings
+    // 3. Category performance breakdown
+    const { data: categoryTrades } = await supabase
+      .from("paper_trades")
+      .select("pnl, ticker, strategy_id")
+      .eq("status", "closed")
+      .not("pnl", "is", null);
+
+    if (categoryTrades && categoryTrades.length > 0) {
+      // Get market → event → category mapping
+      const tickers = [...new Set(categoryTrades.map((t) => t.ticker))];
+      const { data: markets } = await supabase
+        .from("markets")
+        .select("ticker, event_ticker")
+        .in("ticker", tickers);
+
+      const eventTickers = [...new Set((markets ?? []).map((m) => m.event_ticker))];
+      const { data: events } = await supabase
+        .from("events")
+        .select("event_ticker, category")
+        .in("event_ticker", eventTickers);
+
+      const tickerToCategory = new Map<string, string>();
+      const marketMap = new Map((markets ?? []).map((m) => [m.ticker, m.event_ticker]));
+      const eventMap = new Map((events ?? []).map((e) => [e.event_ticker, e.category ?? "unknown"]));
+      for (const [ticker, eventTicker] of marketMap) {
+        tickerToCategory.set(ticker, eventMap.get(eventTicker) ?? "unknown");
+      }
+
+      const catStats = new Map<string, { count: number; wins: number; pnl: number }>();
+      for (const t of categoryTrades) {
+        const cat = tickerToCategory.get(t.ticker) ?? "unknown";
+        const existing = catStats.get(cat) ?? { count: 0, wins: 0, pnl: 0 };
+        existing.count++;
+        if ((t.pnl ?? 0) > 0) existing.wins++;
+        existing.pnl += t.pnl ?? 0;
+        catStats.set(cat, existing);
+      }
+
+      report.categories = Array.from(catStats.entries())
+        .map(([cat, stats]) => ({
+          category: cat,
+          trades: stats.count,
+          wins: stats.wins,
+          win_rate: Math.round((stats.wins / stats.count) * 1000) / 10 + "%",
+          total_pnl: Math.round(stats.pnl * 100) / 100,
+          avg_pnl: Math.round((stats.pnl / stats.count) * 100) / 100,
+        }))
+        .sort((a, b) => b.total_pnl - a.total_pnl);
+    } else {
+      report.categories = [];
+    }
+
+    // 4. Recent learnings
     const { data: learnings } = await supabase
       .from("strategy_learnings")
       .select("*")
@@ -93,7 +145,7 @@ async function main() {
       created_at: l.created_at,
     }));
 
-    // 4. Overall stats
+    // 5. Overall stats
     const { data: allClosed } = await supabase
       .from("paper_trades")
       .select("pnl, created_at")
@@ -140,7 +192,7 @@ async function main() {
       trading_days: dailyPnl.size,
     };
 
-    // 5. Go-live readiness
+    // 6. Go-live readiness
     report.go_live_readiness = {
       resolved_trades: { value: totalResolved, target: 200, met: totalResolved >= 200 },
       win_rate: {
@@ -157,12 +209,88 @@ async function main() {
       },
     };
 
+    // 7. Write review to database
+    const summary = buildSummary(report);
+    const recommendations = buildRecommendations(report);
+    const metrics = {
+      total_resolved: totalResolved,
+      win_rate: totalResolved > 0 ? Math.round((totalWins / totalResolved) * 1000) / 10 : 0,
+      total_pnl: Math.round(totalPnl * 100) / 100,
+      sharpe: Math.round(annualizedSharpe * 100) / 100,
+      max_drawdown: Math.round(maxDrawdown * 100) / 100,
+    };
+
+    await supabase.from("reviews").insert({
+      review_type: "weekly",
+      summary,
+      recommendations,
+      metrics,
+    });
+
+    report.generated_at = new Date().toISOString();
     console.log(JSON.stringify(report, null, 2));
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.log(JSON.stringify({ status: "error", error: errorMessage }));
     process.exit(1);
   }
+}
+
+function buildSummary(report: Record<string, unknown>): string {
+  const overall = report.overall as Record<string, unknown>;
+  const strategies = report.strategies as Array<Record<string, unknown>>;
+
+  const parts = [
+    `Performance report: ${overall.total_resolved} resolved trades, ` +
+    `${overall.win_rate} win rate, $${overall.total_pnl} total P&L, ` +
+    `Sharpe ${overall.sharpe_ratio}.`,
+  ];
+
+  for (const s of strategies) {
+    const status = s.enabled ? "active" : "DISABLED";
+    parts.push(
+      `${s.name} (${status}): ${s.closed_trades} trades, ${s.win_rate} win rate, $${s.total_pnl} P&L.`
+    );
+  }
+
+  return parts.join("\n");
+}
+
+function buildRecommendations(report: Record<string, unknown>): { action: string; priority: string; reasoning: string }[] {
+  const recommendations: { action: string; priority: string; reasoning: string }[] = [];
+  const strategies = report.strategies as Array<Record<string, unknown>>;
+  const overall = report.overall as Record<string, unknown>;
+
+  // Check for bleeding strategies
+  for (const s of strategies) {
+    if ((s.total_pnl as number) < -100) {
+      recommendations.push({
+        action: `Review ${s.name} strategy — significant losses`,
+        priority: "high",
+        reasoning: `${s.name} has $${s.total_pnl} P&L with ${s.win_rate} win rate. Consider disabling or re-parameterizing.`,
+      });
+    }
+  }
+
+  // Check go-live readiness gaps
+  if ((overall.total_resolved as number) < 50) {
+    recommendations.push({
+      action: "Increase trade volume — need more data",
+      priority: "medium",
+      reasoning: `Only ${overall.total_resolved} resolved trades. Need 200+ for go-live assessment. Check if strategies are finding opportunities.`,
+    });
+  }
+
+  // Default recommendation
+  if (recommendations.length === 0) {
+    recommendations.push({
+      action: "Continue monitoring — system operating normally",
+      priority: "low",
+      reasoning: "No critical issues detected. Keep collecting data toward go-live thresholds.",
+    });
+  }
+
+  return recommendations;
 }
 
 main();

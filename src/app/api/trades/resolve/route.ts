@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
 
     let resolved = 0;
     const errors: string[] = [];
+    const resolvedPredictionIds: { id: string; correct: boolean }[] = [];
 
     // Resolve each trade against its market result
     for (const trade of openTrades) {
@@ -82,12 +83,36 @@ export async function GET(request: NextRequest) {
         errors.push(`Failed to close trade ${trade.id}: ${updateError.message}`);
       } else {
         resolved++;
+        // Track linked prediction for resolution
+        if (trade.prediction_id) {
+          resolvedPredictionIds.push({ id: trade.prediction_id, correct: won });
+        }
+      }
+    }
+
+    // Resolve linked predictions
+    let predictionsResolved = 0;
+    for (const { id, correct } of resolvedPredictionIds) {
+      const { error: predError } = await supabase
+        .from("predictions")
+        .update({
+          status: correct ? "correct" : "incorrect",
+          resolved_at: new Date().toISOString(),
+        })
+        .eq("id", id)
+        .eq("status", "pending");
+
+      if (predError) {
+        errors.push(`Failed to resolve prediction ${id}: ${predError.message}`);
+      } else {
+        predictionsResolved++;
       }
     }
 
     return NextResponse.json({
       success: errors.length === 0,
       resolved,
+      predictions_resolved: predictionsResolved,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {

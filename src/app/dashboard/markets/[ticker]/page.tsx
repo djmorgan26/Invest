@@ -77,7 +77,7 @@ export default async function MarketDetailPage({
           <p className="text-xs text-muted-foreground">Last Price</p>
           <p className="mt-1 font-mono text-xl font-semibold">
             {market.last_price != null
-              ? `${(market.last_price * 100).toFixed(0)}\u00a2`
+              ? `${market.last_price}\u00a2`
               : "\u2014"}
           </p>
         </div>
@@ -85,7 +85,7 @@ export default async function MarketDetailPage({
           <p className="text-xs text-muted-foreground">Bid / Ask</p>
           <p className="mt-1 font-mono text-xl font-semibold">
             {market.yes_bid != null && market.yes_ask != null
-              ? `${(market.yes_bid * 100).toFixed(0)}\u00a2 / ${(market.yes_ask * 100).toFixed(0)}\u00a2`
+              ? `${market.yes_bid}\u00a2 / ${market.yes_ask}\u00a2`
               : "\u2014"}
           </p>
         </div>

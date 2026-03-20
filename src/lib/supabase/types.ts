@@ -109,5 +109,25 @@ export interface SyncLogEntry {
   completed_at: string;
 }
 
+export interface MarketContextRow {
+  id: string;
+  ticker: string;
+  context_type: string;
+  content: string;
+  source: string | null;
+  relevance_score: number | null;
+  created_at: string;
+  expires_at: string | null;
+}
+
+export interface ReviewRow {
+  id: string;
+  review_type: string;
+  summary: string;
+  recommendations: { action: string; priority: string; reasoning: string }[] | null;
+  metrics: Record<string, unknown> | null;
+  created_at: string;
+}
+
 // Remove the Database generic — use untyped supabase client
 // This avoids complex type gymnastics while keeping row types for components

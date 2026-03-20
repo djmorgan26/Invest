@@ -1,11 +1,11 @@
 # Kalshi Investment Assistant — Plan
 
 ## Current Status
-Building core infrastructure: API routes, database schema, and project documentation.
+Phase 3 (Self-Optimizing Intelligence Layer) implementation in progress. Phase 1 & 2 complete — autonomous strategy engine is live with 4 strategies scanning every 15 min.
 
 ## Implementation Steps
 
-### Phase 1: Foundation
+### Phase 1: Foundation [COMPLETE]
 - [x] Kalshi API client with RSA signing (`src/lib/kalshi/client.ts`)
 - [x] Kalshi type definitions (`src/lib/kalshi/types.ts`)
 - [x] Supabase server client (`src/lib/supabase/server.ts`)
@@ -18,36 +18,56 @@ Building core infrastructure: API routes, database schema, and project documenta
 - [x] Project CLAUDE.md
 - [x] README with setup instructions
 
-### Phase 2: CLI Scripts
-- [ ] `scripts/sync-markets.ts` — CLI wrapper for market sync
-- [ ] `scripts/snapshot-prices.ts` — CLI wrapper for price snapshots
-- [ ] `scripts/analyze.ts` — Market analysis with Claude
-- [ ] `scripts/paper-trade.ts` — Place paper trades
-- [ ] `scripts/resolve-trades.ts` — CLI wrapper for trade resolution
-- [ ] `scripts/portfolio.ts` — Portfolio summary
+### Phase 2: Autonomous Strategy Engine [COMPLETE]
+- [x] Strategy type definitions (`src/lib/strategies/types.ts`)
+- [x] Strategy engine — scanner, auto-trader, decay detection (`src/lib/strategies/engine.ts`)
+- [x] Wide-spread strategy (`src/lib/strategies/wide-spread.ts`)
+- [x] Stale-price strategy (`src/lib/strategies/stale-price.ts`)
+- [x] Extreme-value strategy (`src/lib/strategies/extreme-value.ts`)
+- [x] Mean-reversion strategy (`src/lib/strategies/mean-reversion.ts`)
+- [x] Auto-tuner (`src/lib/strategies/tuner.ts`)
+- [x] Strategy database tables (`supabase/migrations/002_strategies.sql`)
+- [x] Cron route: strategy scan (`src/app/api/strategies/scan/route.ts`)
+- [x] Cron route: strategy tune (`src/app/api/strategies/tune/route.ts`)
+- [x] Cron route: portfolio snapshot (`src/app/api/portfolio/snapshot/route.ts`)
+- [x] CLI: run-strategies, review-performance scripts
+- [x] Dashboard: strategies page
+- [x] Dashboard: main dashboard, markets, predictions, trades pages
 
-### Phase 3: Analysis Engine
-- [ ] Market screening logic (volume, expiry, catalyst filters)
-- [ ] Claude-powered fair value estimation
-- [ ] Edge calculation and trade recommendation
-- [ ] Prediction tracking and accuracy metrics
+### Phase 3: Self-Optimizing Intelligence Layer [IN PROGRESS]
+- [x] Claude Code custom commands (`.claude/commands/`)
+  - [x] `/project:review` — Weekly performance review
+  - [x] `/project:investigate-market` — Deep-dive market analysis
+  - [x] `/project:new-strategy` — Strategy design + implementation
+  - [x] `/project:market-scan` — Manual intelligent opportunity scan
+  - [x] `/project:health-check` — System operational verification
+- [x] Market context service (`src/lib/intelligence/context.ts`)
+- [x] Category performance tracking (`src/lib/intelligence/categories.ts`)
+- [x] Learning writer utility (`src/lib/intelligence/learnings.ts`)
+- [x] Database migration: market_context + reviews tables (`supabase/migrations/003_intelligence.sql`)
+- [x] Enhanced review-performance.ts (category breakdown, writes to reviews table)
+- [x] Review report API route (`src/app/api/review/report/route.ts`)
+- [x] Dashboard: Reviews & Learnings page (`src/app/dashboard/reviews/page.tsx`)
+- [x] Sidebar: Reviews nav link
+- [x] docs/plan.md and CLAUDE.md updates
 
-### Phase 4: Dashboard
-- [ ] Markets overview page
-- [ ] Watchlist management UI
-- [ ] Price chart components (price_snapshots visualization)
-- [ ] Portfolio and P&L dashboard
-- [ ] Prediction leaderboard / accuracy tracker
+### Phase 4: Advanced Intelligence [BACKLOG]
+- [ ] News-enriched scanning (`src/lib/intelligence/news.ts`)
+- [ ] Market context auto-population via web search
+- [ ] Strategy correlation analysis (do strategies agree or conflict?)
+- [ ] Market regime detection (high-volume vs. low-activity periods)
+- [ ] Automated weekly review via cron (generates + stores review)
 
-### Phase 5: Automation & Optimization
-- [ ] Automated screening cron job
-- [ ] Alert system for high-edge opportunities
-- [ ] Strategy backtesting using historical snapshots
-- [ ] Performance analytics and reporting
+### Phase 5: Go-Live Preparation [BACKLOG]
+- [ ] Reach 200+ resolved trades
+- [ ] Validate all go-live thresholds met
+- [ ] Live trading integration with Kalshi production API
+- [ ] Risk management circuit breakers
+- [ ] Real-time alerting on anomalies
 
 ## Backlog
-- Live trading integration (after paper trading validation)
 - Multi-model prediction ensemble
-- News/social sentiment integration
 - Options-style Greeks for position management
-- Mobile-friendly dashboard
+- Mobile-friendly dashboard improvements
+- Strategy backtesting framework using historical snapshots
+- Cross-event arbitrage strategy

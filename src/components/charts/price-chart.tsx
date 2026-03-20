@@ -32,9 +32,9 @@ export function PriceChart({ snapshots = [] }: PriceChartProps) {
       day: "numeric",
       hour: "numeric",
     }),
-    price: Math.round(s.last_price * 100),
-    bid: Math.round(s.yes_bid * 100),
-    ask: Math.round(s.yes_ask * 100),
+    price: s.last_price,
+    bid: s.yes_bid,
+    ask: s.yes_ask,
   }));
 
   return (

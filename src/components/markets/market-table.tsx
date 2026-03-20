@@ -150,12 +150,12 @@ export function MarketTable({ markets }: MarketTableProps) {
                   </td>
                   <td className="px-4 py-3 text-right font-mono">
                     {market.last_price != null
-                      ? `${(market.last_price * 100).toFixed(0)}\u00a2`
+                      ? `${market.last_price}\u00a2`
                       : "\u2014"}
                   </td>
                   <td className="px-4 py-3 text-right font-mono">
                     {market.yes_bid != null && market.yes_ask != null
-                      ? `${(market.yes_bid * 100).toFixed(0)}\u00a2 / ${(market.yes_ask * 100).toFixed(0)}\u00a2`
+                      ? `${market.yes_bid}\u00a2 / ${market.yes_ask}\u00a2`
                       : "\u2014"}
                   </td>
                   <td className="px-4 py-3 text-right font-mono">

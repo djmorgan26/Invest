@@ -19,7 +19,7 @@ The goal is not to have opinions about markets. The goal is to have a system tha
 ## Project Overview
 AI-powered prediction market analysis tool. Syncs Kalshi markets, tracks prices, generates predictions via Claude Code, and paper trades to validate strategy before risking real capital.
 
-**Architecture:** Next.js dashboard + Supabase (DB/Auth) + Kalshi API + Claude Code (AI brain) + Autonomous Strategy Engine
+**Architecture:** Next.js dashboard + Supabase (DB/Auth) + Kalshi API + Claude Code (AI brain) + Autonomous Strategy Engine + Intelligence Layer
 
 ## Quick Commands
 
@@ -33,6 +33,18 @@ AI-powered prediction market analysis tool. Syncs Kalshi markets, tracks prices,
 | Resolve trades | `npx tsx src/scripts/resolve-trades.ts` |
 | **Run strategies** | `npx tsx src/scripts/run-strategies.ts` |
 | **Review performance** | `npx tsx src/scripts/review-performance.ts` |
+
+## Claude Code Slash Commands
+
+Use these for structured analysis sessions:
+
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| `/project:review` | Weekly performance review with recommendations | Weekly, or when assessing strategy health |
+| `/project:investigate-market` | Deep-dive into a specific market/event | When a market looks interesting or suspicious |
+| `/project:new-strategy` | Design and implement a new strategy | When patterns suggest a new approach |
+| `/project:market-scan` | Manual intelligent scan for opportunities | When looking beyond what automation finds |
+| `/project:health-check` | System operational verification | When something seems off, or weekly check |
 
 ## Autonomous Operation
 
@@ -66,14 +78,41 @@ Four autonomous strategies scan for opportunities:
 - **Auto-tuning:** Weekly parameter adjustment based on trade outcomes (needs 30+ resolved trades)
 
 ### Learning Loop
-The system improves over time through two mechanisms:
+The system improves over time through three mechanisms:
 
 1. **Auto-tuner** (`/api/strategies/tune`): Analyzes resolved trades per strategy, adjusts config parameters (spread thresholds, volume filters, etc.), and logs changes to `strategy_learnings` table.
 
-2. **Claude Code review sessions**: Run `npx tsx src/scripts/review-performance.ts` to get a comprehensive report. Claude reads the data and suggests:
+2. **Claude Code review sessions**: Run `/project:review` to get a comprehensive report. Claude reads the data and suggests:
    - New strategy ideas based on patterns
    - Parameter adjustments beyond auto-tuner capability
    - Markets/categories to focus on or avoid
+
+3. **Persistent learnings**: Insights are recorded to `strategy_learnings` with typed categories, creating a compounding knowledge base across sessions.
+
+## Intelligence Layer
+
+### Market Context (`src/lib/intelligence/context.ts`)
+Aggregates everything known about a market into one object:
+- Market data + event info + category
+- 24h price history from snapshots
+- Sibling markets in same event
+- Open trades and recent predictions
+- Derived: days to close, spread size
+
+### Category Performance (`src/lib/intelligence/categories.ts`)
+Tracks which Kalshi categories (politics, crypto, weather, etc.) produce the best trades. Feeds into strategy scanning to focus on high-performing areas.
+
+### Learning Types (`src/lib/intelligence/learnings.ts`)
+Records structured insights to `strategy_learnings`:
+- `param_change` — Threshold adjustments from tuner
+- `category_insight` — "Wide-spread works best in sports markets"
+- `regime_change` — "Volume dropped 40% this week"
+- `strategy_idea` — Ideas for future strategies from review sessions
+- `market_pattern` — Recurring market behaviors
+- `failure_analysis` — Post-mortem on bad trades
+
+### Reviews (`src/app/api/review/report/route.ts`)
+API endpoint returning comprehensive JSON report. Also stored in `reviews` table with recommendations and metrics snapshot.
 
 ## Trading Rules
 - **Minimum edge:** $0.05 (fair value vs. market price)
@@ -104,6 +143,7 @@ src/
     strategies/scan/          # Run strategies + auto-trade (every 15 min)
     strategies/tune/          # Auto-tune parameters (weekly)
     portfolio/snapshot/       # Portfolio value tracking (hourly)
+    review/report/            # Review report JSON API
   lib/
     kalshi/client.ts          # Authenticated Kalshi API client
     kalshi/types.ts           # Kalshi response types
@@ -115,16 +155,33 @@ src/
       stale-price.ts          # Stale price strategy
       extreme-value.ts        # Extreme value strategy
       mean-reversion.ts       # Mean reversion strategy
+    intelligence/             # Self-optimizing intelligence layer
+      context.ts              # Market data aggregation
+      categories.ts           # Category performance tracking
+      learnings.ts            # Persistent learning writer
     supabase/server.ts        # Supabase service-role client
     supabase/types.ts         # DB row types
   scripts/                    # CLI entry points
     run-strategies.ts         # Local strategy runner
-    review-performance.ts     # Comprehensive report for Claude review
+    review-performance.ts     # Comprehensive report (writes to reviews table)
   app/dashboard/
     strategies/page.tsx       # Strategy performance + learnings view
+    reviews/page.tsx          # Reviews & learnings history
+  components/layout/
+    sidebar.tsx               # Navigation (includes Reviews link)
 supabase/migrations/
   001_initial_schema.sql      # Base tables
   002_strategies.sql          # Strategies + learnings tables
+  003_intelligence.sql        # Market context + reviews tables
+.claude/commands/             # Claude Code slash commands
+  review.md                   # /project:review
+  investigate-market.md       # /project:investigate-market
+  new-strategy.md             # /project:new-strategy
+  market-scan.md              # /project:market-scan
+  health-check.md             # /project:health-check
+docs/
+  plan.md                     # Implementation plan + backlog
+  reviews/                    # Timestamped review files
 vercel.json                   # Cron schedule config
 ```
 
@@ -136,7 +193,7 @@ vercel.json                   # Cron schedule config
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `CRON_SECRET`
 
-## DB Tables (10 total)
+## DB Tables (12 total)
 - `events` — Event catalog
 - `markets` — Market data (43K+ synced)
 - `price_snapshots` — Price history time series
@@ -146,4 +203,6 @@ vercel.json                   # Cron schedule config
 - `watchlist` — Tracked tickers
 - `sync_log` — Operation history
 - `strategies` — Strategy configs and enabled/disabled state
-- `strategy_learnings` — Tuning audit trail
+- `strategy_learnings` — Tuning audit trail + persistent insights
+- `market_context` — News, sentiment, catalysts cache
+- `reviews` — Structured review reports with recommendations
