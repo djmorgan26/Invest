@@ -22,6 +22,8 @@ export interface Market {
   open_interest: number | null;
   close_time: string | null;
   result: string | null;
+  volume_24h: number | null;
+  liquidity: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +63,7 @@ export interface PaperTrade {
   exit_price: number | null;
   pnl: number | null;
   prediction_id: string | null;
+  fee: number;
   strategy_id: string | null;
   created_at: string;
   closed_at: string | null;
@@ -127,6 +130,17 @@ export interface ReviewRow {
   recommendations: { action: string; priority: string; reasoning: string }[] | null;
   metrics: Record<string, unknown> | null;
   created_at: string;
+}
+
+export interface OrderbookSnapshot {
+  id: string;
+  ticker: string;
+  best_yes_bid: number | null;
+  best_yes_ask: number | null;
+  spread: number | null;
+  depth_yes_bid: { price: number; quantity: number }[] | null;
+  depth_yes_ask: { price: number; quantity: number }[] | null;
+  snapshot_at: string;
 }
 
 // Remove the Database generic — use untyped supabase client

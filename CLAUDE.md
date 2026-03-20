@@ -48,16 +48,17 @@ Use these for structured analysis sessions:
 
 ## Autonomous Operation
 
-The system runs autonomously via Vercel Cron jobs:
+The system runs autonomously via GitHub Actions cron jobs (`.github/workflows/crons.yml`):
 
 | Job | Frequency | What it does |
 |-----|-----------|--------------|
 | Market sync | Every 6h | Sync all active markets from Kalshi API |
-| Price snapshots | Every 5 min | Track prices for watchlisted markets |
-| **Strategy scan** | Every 15 min | Run all enabled strategies, auto-trade opportunities |
+| Price snapshots | Every 5 min | Track prices for watchlisted + top 200 volume markets |
+| **Strategy scan** | Every 5 min | Run all enabled strategies, auto-trade opportunities |
 | Trade resolution | Every 30 min | Check settlements, close trades, calculate P&L |
 | **Portfolio snapshot** | Every 1h | Compute and store portfolio value |
 | **Strategy tuning** | Weekly (Sun) | Auto-adjust strategy parameters based on results |
+| **Orderbook snapshot** | Every 5 min | Capture order book depth for watchlisted tickers |
 
 ## Strategies
 
@@ -136,13 +137,14 @@ API endpoint returning comprehensive JSON report. Also stored in `reviews` table
 ## Architecture
 ```
 src/
-  app/api/                    # Vercel Cron route handlers
+  app/api/                    # Cron route handlers (called by GitHub Actions)
     markets/sync/             # Sync all active markets + events
-    prices/snapshot/          # Snapshot watchlist prices
+    prices/snapshot/          # Snapshot watchlist + top 200 volume markets
     trades/resolve/           # Settle open paper trades
-    strategies/scan/          # Run strategies + auto-trade (every 15 min)
+    strategies/scan/          # Run strategies + auto-trade (every 5 min)
     strategies/tune/          # Auto-tune parameters (weekly)
     portfolio/snapshot/       # Portfolio value tracking (hourly)
+    orderbook/snapshot/       # Order book depth snapshots
     review/report/            # Review report JSON API
   lib/
     kalshi/client.ts          # Authenticated Kalshi API client
@@ -173,6 +175,7 @@ supabase/migrations/
   001_initial_schema.sql      # Base tables
   002_strategies.sql          # Strategies + learnings tables
   003_intelligence.sql        # Market context + reviews tables
+  004_expand_markets.sql      # volume_24h, liquidity, fee, orderbook_snapshots
 .claude/commands/             # Claude Code slash commands
   review.md                   # /project:review
   investigate-market.md       # /project:investigate-market
@@ -182,7 +185,7 @@ supabase/migrations/
 docs/
   plan.md                     # Implementation plan + backlog
   reviews/                    # Timestamped review files
-vercel.json                   # Cron schedule config
+.github/workflows/crons.yml  # GitHub Actions cron schedules
 ```
 
 ## Key Environment Variables
@@ -193,7 +196,7 @@ vercel.json                   # Cron schedule config
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `CRON_SECRET`
 
-## DB Tables (12 total)
+## DB Tables (13 total)
 - `events` — Event catalog
 - `markets` — Market data (43K+ synced)
 - `price_snapshots` — Price history time series
@@ -206,3 +209,4 @@ vercel.json                   # Cron schedule config
 - `strategy_learnings` — Tuning audit trail + persistent insights
 - `market_context` — News, sentiment, catalysts cache
 - `reviews` — Structured review reports with recommendations
+- `orderbook_snapshots` — Order book depth history (bid/ask levels)

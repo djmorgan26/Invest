@@ -6,8 +6,8 @@ on:
     - cron: '0 */6 * * *'
     # Price snapshots — every 5 minutes
     - cron: '*/5 * * * *'
-    # Strategy scan + auto-trade — every 15 minutes
-    - cron: '*/15 * * * *'
+    # Strategy scan + auto-trade — every 5 minutes
+    - cron: '1,6,11,16,21,26,31,36,41,46,51,56 * * * *'
     # Trade resolution — every 30 minutes
     - cron: '*/30 * * * *'
     # Portfolio snapshot — every hour
@@ -27,6 +27,7 @@ on:
           - resolve
           - portfolio
           - tune
+          - orderbook
           - all
 
 jobs:
@@ -49,7 +50,7 @@ jobs:
             "${{ secrets.APP_URL }}/api/prices/snapshot"
 
   scan:
-    if: github.event.schedule == '*/15 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'scan' || inputs.job == 'all'))
+    if: github.event.schedule == '1,6,11,16,21,26,31,36,41,46,51,56 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'scan' || inputs.job == 'all'))
     runs-on: ubuntu-latest
     steps:
       - name: Strategy scan + auto-trade
@@ -83,3 +84,12 @@ jobs:
         run: |
           curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.APP_URL }}/api/strategies/tune"
+
+  orderbook:
+    if: github.event.schedule == '*/5 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'orderbook' || inputs.job == 'all'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Orderbook snapshots
+        run: |
+          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/orderbook/snapshot"

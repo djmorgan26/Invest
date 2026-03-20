@@ -89,6 +89,23 @@ export async function scanAll(): Promise<{
     }
   }
 
+  // Auto-watchlist top 50 opportunity tickers so price snapshots cover them
+  if (allOpportunities.length > 0) {
+    const topTickers = allOpportunities
+      .sort((a, b) => b.edge - a.edge)
+      .slice(0, 50)
+      .map((opp) => ({
+        ticker: opp.ticker,
+        notes: `Auto-watchlisted by strategy scan`,
+      }));
+
+    for (const item of topTickers) {
+      await supabase
+        .from("watchlist")
+        .upsert(item, { onConflict: "ticker" });
+    }
+  }
+
   return {
     opportunities: allOpportunities.sort((a, b) => b.edge - a.edge),
     strategiesRun,
@@ -230,6 +247,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
         quantity,
         price: Math.round(entryPrice * 10000) / 10000,
         cost: totalCost,
+        fee: Math.round(fee * 100) / 100,
         status: "open",
         prediction_id: prediction.id,
         strategy_id: opp.strategy_id,

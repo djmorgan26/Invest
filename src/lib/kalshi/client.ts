@@ -5,6 +5,7 @@ import type {
   KalshiMarketsResponse,
   KalshiEventResponse,
   KalshiTradesResponse,
+  KalshiOrderBookResponse,
   KalshiMarket,
 } from "./types";
 import { dollarsToCents, fpToInt } from "./types";
@@ -24,6 +25,8 @@ export interface NormalizedMarket {
   close_time: string;
   result: string;
   market_type: string;
+  volume_24h: number | null;
+  liquidity: number | null;
 }
 
 export function normalizeMarket(m: KalshiMarket): NormalizedMarket {
@@ -41,6 +44,8 @@ export function normalizeMarket(m: KalshiMarket): NormalizedMarket {
     close_time: m.close_time,
     result: m.result,
     market_type: m.market_type,
+    volume_24h: fpToInt(m.volume_24h_fp),
+    liquidity: m.liquidity_dollars ? parseFloat(m.liquidity_dollars) : null,
   };
 }
 
@@ -194,4 +199,15 @@ export async function getMarketRaw(ticker: string): Promise<KalshiMarket> {
 export async function getMarket(ticker: string): Promise<NormalizedMarket> {
   const raw = await getMarketRaw(ticker);
   return normalizeMarket(raw);
+}
+
+export async function getOrderBook(
+  ticker: string,
+  depth: number = 5
+): Promise<KalshiOrderBookResponse> {
+  return kalshiFetch<KalshiOrderBookResponse>(
+    "GET",
+    `/markets/${ticker}/orderbook`,
+    { depth: depth.toString() }
+  );
 }

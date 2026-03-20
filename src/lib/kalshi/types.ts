@@ -55,6 +55,16 @@ export interface KalshiTradesResponse {
   cursor: string;
 }
 
+// Kalshi returns orderbook as [price_dollars_string, quantity_string] tuples
+export type KalshiOrderBookEntry = [string, string];
+
+export interface KalshiOrderBookResponse {
+  orderbook_fp: {
+    yes_dollars: KalshiOrderBookEntry[];
+    no_dollars: KalshiOrderBookEntry[];
+  };
+}
+
 // Helper to convert Kalshi dollar strings to cents (0-100 scale for DB)
 export function dollarsToCents(dollars: string | null | undefined): number | null {
   if (!dollars) return null;

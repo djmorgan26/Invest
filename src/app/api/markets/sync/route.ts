@@ -53,6 +53,8 @@ export async function GET(request: NextRequest) {
         open_interest: fpToInt(m.open_interest_fp),
         close_time: m.close_time,
         result: m.result || null,
+        volume_24h: fpToInt(m.volume_24h_fp),
+        liquidity: m.liquidity_dollars ? parseFloat(m.liquidity_dollars) : null,
       }));
       const { error } = await supabase
         .from("markets")

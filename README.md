@@ -7,7 +7,7 @@ AI-powered prediction market analysis and paper trading platform built on Next.j
 - Node.js 18+
 - Supabase project (free tier works)
 - Kalshi API key pair (demo or production)
-- Vercel account (for cron deployment)
+- GitHub repository (for Actions cron scheduling)
 
 ## Setup
 
@@ -35,7 +35,7 @@ KALSHI_API_PRIVATE_KEY_PATH=./kalshi/private_key.pem
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
-# Vercel Cron
+# Cron (used by GitHub Actions to authenticate API calls)
 CRON_SECRET=your_random_secret
 ```
 
@@ -60,9 +60,11 @@ npm run dev
 ```
 Next.js App Router (dashboard + API routes)
     |
-    +-- Vercel Cron --> /api/markets/sync     (sync markets hourly)
-    +-- Vercel Cron --> /api/prices/snapshot   (snapshot prices every 15 min)
-    +-- Vercel Cron --> /api/trades/resolve    (settle trades hourly)
+    +-- GitHub Actions Cron --> /api/markets/sync       (sync markets every 6h)
+    +-- GitHub Actions Cron --> /api/prices/snapshot    (snapshot prices every 5 min)
+    +-- GitHub Actions Cron --> /api/trades/resolve     (settle trades every 30 min)
+    +-- GitHub Actions Cron --> /api/strategies/scan    (strategy scan every 5 min)
+    +-- GitHub Actions Cron --> /api/orderbook/snapshot (order book depth every 5 min)
     |
     +-- Supabase (PostgreSQL)
     |     events, markets, price_snapshots,

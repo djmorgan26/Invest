@@ -14,7 +14,7 @@ Phase 3 (Self-Optimizing Intelligence Layer) complete. Phase 2.5 (Kalshi-aware t
 - [x] API route: market sync (`src/app/api/markets/sync/route.ts`)
 - [x] API route: price snapshots (`src/app/api/prices/snapshot/route.ts`)
 - [x] API route: trade resolution (`src/app/api/trades/resolve/route.ts`)
-- [x] Vercel cron configuration (`vercel.json`)
+- [x] GitHub Actions cron configuration (`.github/workflows/crons.yml`)
 - [x] Project CLAUDE.md
 - [x] README with setup instructions
 
@@ -63,15 +63,16 @@ Phase 3 (Self-Optimizing Intelligence Layer) complete. Phase 2.5 (Kalshi-aware t
 - [x] Lowered Mean Reversion min_move (12¢ from 15¢) for more opportunities
 - [x] Kalshi mechanics reference doc (`docs/kalshi-mechanics.md`)
 
-### Phase 4: Data Collection & Strategy Validation [NEXT]
-- [ ] Auto-watchlist all evaluated markets (unblocks Mean Reversion)
-- [ ] Expand price snapshots to top 200 markets by volume
-- [ ] Store order book depth (`orderbook_snapshots` table)
-- [ ] Store `volume_24h` and `liquidity` in markets table
-- [ ] Increase scan frequency to every 5 min
+### Phase 4: Data Collection & Strategy Validation [IN PROGRESS]
+- [x] Auto-watchlist all evaluated markets (unblocks Mean Reversion)
+- [x] Expand price snapshots to top 200 markets by volume
+- [x] Store order book depth (`orderbook_snapshots` table + API route)
+- [x] Store `volume_24h` and `liquidity` in markets table
+- [x] Increase scan frequency to every 5 min
+- [x] Per-trade fee tracking in paper trades
+- [x] Remove all Vercel cron references (using GitHub Actions)
 - [ ] Event cluster arbitrage strategy
 - [ ] Volume spike detector strategy
-- [ ] Per-trade fee tracking in paper trades
 - [ ] Slippage estimation from order book depth
 - [ ] Automated daily P&L dashboard
 
