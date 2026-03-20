@@ -37,8 +37,14 @@ jobs:
     steps:
       - name: Sync markets
         run: |
-          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/markets/sync"
+          HTTP_CODE=$(curl -sS -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/markets/sync")
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::HTTP $HTTP_CODE from /api/markets/sync"
+            exit 1
+          fi
 
   snapshot:
     if: github.event.schedule == '*/5 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'snapshot' || inputs.job == 'all'))
@@ -46,8 +52,14 @@ jobs:
     steps:
       - name: Price snapshots
         run: |
-          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/prices/snapshot"
+          HTTP_CODE=$(curl -sS -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/prices/snapshot")
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::HTTP $HTTP_CODE from /api/prices/snapshot"
+            exit 1
+          fi
 
   scan:
     if: github.event.schedule == '1,6,11,16,21,26,31,36,41,46,51,56 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'scan' || inputs.job == 'all'))
@@ -55,8 +67,14 @@ jobs:
     steps:
       - name: Strategy scan + auto-trade
         run: |
-          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/strategies/scan"
+          HTTP_CODE=$(curl -sS -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/strategies/scan")
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::HTTP $HTTP_CODE from /api/strategies/scan"
+            exit 1
+          fi
 
   resolve:
     if: github.event.schedule == '*/30 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'resolve' || inputs.job == 'all'))
@@ -64,8 +82,14 @@ jobs:
     steps:
       - name: Resolve trades
         run: |
-          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/trades/resolve"
+          HTTP_CODE=$(curl -sS -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/trades/resolve")
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::HTTP $HTTP_CODE from /api/trades/resolve"
+            exit 1
+          fi
 
   portfolio:
     if: github.event.schedule == '0 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'portfolio' || inputs.job == 'all'))
@@ -73,8 +97,14 @@ jobs:
     steps:
       - name: Portfolio snapshot
         run: |
-          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/portfolio/snapshot"
+          HTTP_CODE=$(curl -sS -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/portfolio/snapshot")
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::HTTP $HTTP_CODE from /api/portfolio/snapshot"
+            exit 1
+          fi
 
   tune:
     if: github.event.schedule == '0 0 * * 0' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'tune' || inputs.job == 'all'))
@@ -82,8 +112,14 @@ jobs:
     steps:
       - name: Tune strategies
         run: |
-          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/strategies/tune"
+          HTTP_CODE=$(curl -sS -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/strategies/tune")
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::HTTP $HTTP_CODE from /api/strategies/tune"
+            exit 1
+          fi
 
   orderbook:
     if: github.event.schedule == '*/5 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'orderbook' || inputs.job == 'all'))
@@ -91,5 +127,11 @@ jobs:
     steps:
       - name: Orderbook snapshots
         run: |
-          curl -sf -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/orderbook/snapshot"
+          HTTP_CODE=$(curl -sS -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/orderbook/snapshot")
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::HTTP $HTTP_CODE from /api/orderbook/snapshot"
+            exit 1
+          fi
