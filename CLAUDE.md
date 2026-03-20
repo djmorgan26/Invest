@@ -40,11 +40,13 @@ Use these for structured analysis sessions:
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
-| `/project:review` | Weekly performance review with recommendations | Weekly, or when assessing strategy health |
+| `/project:review` | Performance review with recommendations | When you only need the P&L report |
 | `/project:investigate-market` | Deep-dive into a specific market/event | When a market looks interesting or suspicious |
 | `/project:new-strategy` | Design and implement a new strategy | When patterns suggest a new approach |
 | `/project:market-scan` | Manual intelligent scan for opportunities | When looking beyond what automation finds |
 | `/project:health-check` | System operational verification | When something seems off, or weekly check |
+
+**Skill: `kalshi-advisor`** — The primary check-in tool. Auto-triggers when working with strategy files, plan docs, or review files. Runs a full strategic advisor session: health check, performance review, market scan, strategic decisions, and persists learnings. Use this every 2-3 days during data collection phase.
 
 ## Autonomous Operation
 
