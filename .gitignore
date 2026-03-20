@@ -1,0 +1,21 @@
+# env files
+.env
+.env*.local
+
+# kalshi keys
+kalshi/*.pem
+
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+
+# vercel
+.vercel
+
+# misc
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts

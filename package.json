@@ -1,0 +1,38 @@
+{
+  "name": "invest",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0",
+    "@supabase/supabase-js": "^2",
+    "class-variance-authority": "^0.7",
+    "clsx": "^2",
+    "date-fns": "^4",
+    "dotenv": "^17.3.1",
+    "lucide-react": "latest",
+    "next": "^16",
+    "react": "^19",
+    "react-dom": "^19",
+    "recharts": "^2",
+    "tailwind-merge": "^3"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "^16",
+    "postcss": "^8",
+    "tailwindcss": "^4",
+    "tsx": "^4",
+    "typescript": "^5"
+  }
+}
