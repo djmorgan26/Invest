@@ -1,9 +1,10 @@
 import type { Market } from "@/lib/supabase/types";
 import type { Strategy, Opportunity, ScanContext, StrategyConfig } from "./types";
+import { isEntryPriceSafe, minEdgeAfterFees, riskRewardRatio } from "./kalshi-math";
 
 const STRATEGY_ID = "mean-reversion";
 const DEFAULT_CONFIG = {
-  min_move: 0.15,
+  min_move: 0.12, // lowered from 0.15 to catch more opportunities
   lookback_hours: 24,
   reversion_factor: 0.5,
 };
@@ -38,18 +39,25 @@ export const meanReversion: Strategy = {
     if (tickers.length === 0) return opportunities;
 
     // Get oldest snapshot within lookback window per ticker
-    const { data: oldSnapshots } = await context.supabase
-      .from("price_snapshots")
-      .select("ticker, last_price, snapshot_at")
-      .in("ticker", tickers)
-      .gte("snapshot_at", lookbackCutoff.toISOString())
-      .order("snapshot_at", { ascending: true });
+    // Query in batches to avoid URL length issues with large IN clauses
+    const batchSize = 500;
+    const allSnapshots: Array<{ ticker: string; last_price: number; snapshot_at: string }> = [];
+    for (let i = 0; i < tickers.length; i += batchSize) {
+      const batch = tickers.slice(i, i + batchSize);
+      const { data: snapshots } = await context.supabase
+        .from("price_snapshots")
+        .select("ticker, last_price, snapshot_at")
+        .in("ticker", batch)
+        .gte("snapshot_at", lookbackCutoff.toISOString())
+        .order("snapshot_at", { ascending: true });
+      if (snapshots) allSnapshots.push(...snapshots);
+    }
 
-    if (!oldSnapshots || oldSnapshots.length === 0) return opportunities;
+    if (allSnapshots.length === 0) return opportunities;
 
     // Build map: ticker → earliest snapshot price in lookback window
     const earliestPrice = new Map<string, number>();
-    for (const snap of oldSnapshots) {
+    for (const snap of allSnapshots) {
       if (!earliestPrice.has(snap.ticker)) {
         earliestPrice.set(snap.ticker, snap.last_price);
       }
@@ -60,7 +68,7 @@ export const meanReversion: Strategy = {
       if (oldPrice == null) continue;
 
       const currentPrice = m.last_price! / 100; // normalize
-      const oldPriceNorm = oldPrice / 100; // snapshots store raw values like markets
+      const oldPriceNorm = oldPrice / 100;
       const move = currentPrice - oldPriceNorm;
       const absMove = Math.abs(move);
 
@@ -70,25 +78,35 @@ export const meanReversion: Strategy = {
       const reversionAmount = absMove * config.reversion_factor;
       let side: "yes" | "no";
       let fairValue: number;
+      let entryPrice: number;
 
       if (move > 0) {
         // Price went up sharply — bet it reverts down → buy NO
         side = "no";
         fairValue = 1 - (currentPrice - reversionAmount);
+        entryPrice = m.yes_bid != null ? (100 - m.yes_bid) / 100 : 1 - currentPrice;
       } else {
         // Price went down sharply — bet it reverts up → buy YES
         side = "yes";
         fairValue = currentPrice + reversionAmount;
+        entryPrice = m.yes_ask != null ? m.yes_ask / 100 : currentPrice;
       }
 
       // Clamp fair value
-      fairValue = Math.max(0.05, Math.min(0.95, fairValue));
+      fairValue = Math.max(0.10, Math.min(0.90, fairValue));
+
+      // Entry price guardrails
+      if (!isEntryPriceSafe(entryPrice, STRATEGY_ID)) continue;
+
+      // Risk/reward check
+      if (riskRewardRatio(entryPrice) < 0.20) continue;
 
       const edge = side === "yes"
-        ? fairValue - currentPrice
+        ? fairValue - entryPrice
         : fairValue - (1 - currentPrice);
 
-      if (edge < 0.05) continue;
+      // Edge must clear fees
+      if (edge < minEdgeAfterFees(entryPrice)) continue;
 
       const daysToClose = m.close_time
         ? (new Date(m.close_time).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
@@ -106,8 +124,8 @@ export const meanReversion: Strategy = {
         confidence: Math.min(0.5 + edge * 0.3, 0.70),
         fair_value: Math.round(fairValue * 10000) / 10000,
         edge: Math.round(edge * 10000) / 10000,
-        reasoning: `Mean reversion: price moved ${move > 0 ? "+" : ""}${(move * 100).toFixed(1)}¢ in ${config.lookback_hours}h (${(oldPriceNorm * 100).toFixed(0)}¢ → ${(currentPrice * 100).toFixed(0)}¢). Expecting ${(config.reversion_factor * 100).toFixed(0)}% reversion. Volume=${m.volume}.`,
-        quantity: 10,
+        reasoning: `Mean reversion: ${(move > 0 ? "+" : "")}${(move * 100).toFixed(1)}¢ in ${config.lookback_hours}h (${(oldPriceNorm * 100).toFixed(0)}¢→${(currentPrice * 100).toFixed(0)}¢). Entry=${(entryPrice * 100).toFixed(0)}¢ ${side.toUpperCase()}. R/R=${riskRewardRatio(entryPrice).toFixed(2)}. Vol=${m.volume}.`,
+        quantity: 10, // engine will resize
       });
     }
 

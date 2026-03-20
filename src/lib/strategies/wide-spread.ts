@@ -1,11 +1,16 @@
 import type { Market } from "@/lib/supabase/types";
 import type { Strategy, Opportunity, ScanContext, StrategyConfig } from "./types";
+import { isEntryPriceSafe, minEdgeAfterFees, riskRewardRatio } from "./kalshi-math";
 
 const STRATEGY_ID = "wide-spread";
 const DEFAULT_CONFIG = {
-  min_spread: 0.10,
+  min_spread: 0.10, // 10¢ minimum spread
   min_volume: 100,
   max_days_to_close: 14,
+  // New guardrails
+  max_entry_price: 0.85, // never pay more than 85¢
+  min_entry_price: 0.10, // avoid longshots below 10¢
+  min_risk_reward: 0.20, // minimum reward/risk ratio
 };
 
 function getConfig(dbConfig: StrategyConfig) {
@@ -17,7 +22,6 @@ export const wideSpread: Strategy = {
   name: "Wide Spread",
 
   async scan(markets: Market[], context: ScanContext): Promise<Opportunity[]> {
-    // Load strategy config from DB
     const { data: strategy } = await context.supabase
       .from("strategies")
       .select("config")
@@ -33,7 +37,7 @@ export const wideSpread: Strategy = {
       if (m.yes_bid == null || m.yes_ask == null) continue;
       if (m.result) continue;
 
-      // Kalshi prices are stored as 0-100 in DB (cents)
+      // Kalshi prices stored as 0-100 (cents)
       const bid = m.yes_bid;
       const ask = m.yes_ask;
       const spread = ask - bid;
@@ -51,14 +55,34 @@ export const wideSpread: Strategy = {
         if (daysToClose < 0 || daysToClose > config.max_days_to_close) continue;
       }
 
-      // Strategy: buy at midpoint, edge = half the spread
-      const midpoint = (bid + ask) / 2 / 100; // normalize to 0-1
-      const edge = spreadNorm / 2;
+      // Strategy: buy at the ask (taker), edge = midpoint - ask for YES, or midpoint for NO
+      const midpoint = (bid + ask) / 2 / 100; // 0-1
 
-      // Buy YES if midpoint < 0.5, NO if midpoint > 0.5
+      // Determine side: buy YES if midpoint < 0.5, NO if > 0.5
       const side: "yes" | "no" = midpoint <= 0.5 ? "yes" : "no";
-      const price = side === "yes" ? ask / 100 : (100 - bid) / 100;
+
+      // Entry price = what we actually pay as a taker
+      const entryPrice = side === "yes" ? ask / 100 : (100 - bid) / 100;
+
+      // --- PRICE GUARDRAILS ---
+      if (entryPrice > config.max_entry_price || entryPrice < config.min_entry_price) continue;
+      if (!isEntryPriceSafe(entryPrice, STRATEGY_ID)) continue;
+
+      // Risk/reward check: at 90¢ entry, you risk 90¢ to make 10¢ (ratio 0.11) — bad
+      // at 60¢ entry, you risk 60¢ to make 40¢ (ratio 0.67) — good
+      const rr = riskRewardRatio(entryPrice);
+      if (rr < config.min_risk_reward) continue;
+
+      // Edge = half spread (we capture the spread by buying at midpoint theory)
+      // But realistically we pay the ask, so edge = fairValue - entryPrice
       const fairValue = side === "yes" ? midpoint : 1 - midpoint;
+      const edge = fairValue - entryPrice;
+
+      // Edge must clear Kalshi fees
+      if (edge < minEdgeAfterFees(entryPrice)) continue;
+
+      // Must have positive edge after fee calculation
+      if (edge <= 0) continue;
 
       opportunities.push({
         ticker: m.ticker,
@@ -66,15 +90,14 @@ export const wideSpread: Strategy = {
         market_title: m.title,
         strategy_id: STRATEGY_ID,
         side,
-        confidence: Math.min(0.5 + edge, 0.8), // moderate confidence
+        confidence: Math.min(0.5 + edge, 0.8),
         fair_value: Math.round(fairValue * 10000) / 10000,
         edge: Math.round(edge * 10000) / 10000,
-        reasoning: `Wide spread detected: bid=${bid}¢ ask=${ask}¢ spread=${spread}¢. Midpoint=${(midpoint * 100).toFixed(1)}¢. Edge=${(edge * 100).toFixed(1)}¢ from spread capture. Volume=${m.volume}.`,
-        quantity: 10, // default quantity, engine will adjust
+        reasoning: `Wide spread: bid=${bid}¢ ask=${ask}¢ spread=${spread}¢. Entry=${(entryPrice * 100).toFixed(0)}¢ ${side.toUpperCase()}. R/R=${rr.toFixed(2)}. Edge=${(edge * 100).toFixed(1)}¢. Vol=${m.volume}.`,
+        quantity: 10, // engine will resize based on liquidity
       });
     }
 
-    // Sort by edge descending
     opportunities.sort((a, b) => b.edge - a.edge);
     return opportunities;
   },

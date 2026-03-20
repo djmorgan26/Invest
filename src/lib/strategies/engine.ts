@@ -1,6 +1,13 @@
 import { createServerClient } from "@/lib/supabase/server";
 import type { Market } from "@/lib/supabase/types";
 import type { Opportunity, Strategy, StrategyPerformance } from "./types";
+import {
+  isEntryPriceSafe,
+  minEdgeAfterFees,
+  sizePosition,
+  expectedValue,
+  takerFee,
+} from "./kalshi-math";
 import { wideSpread } from "./wide-spread";
 import { stalePrice } from "./stale-price";
 import { extremeValue } from "./extreme-value";
@@ -9,9 +16,7 @@ import { meanReversion } from "./mean-reversion";
 const ALL_STRATEGIES: Strategy[] = [wideSpread, stalePrice, extremeValue, meanReversion];
 
 const STARTING_BALANCE = 10000;
-const MAX_PORTFOLIO_FRACTION = 0.10; // 10% max per market
 const MAX_OPEN_PER_STRATEGY = 5;
-const MIN_EDGE = 0.05;
 const DECAY_WINDOW = 20; // last N trades to check for performance decay
 const DECAY_WIN_RATE_THRESHOLD = 0.40;
 
@@ -121,9 +126,29 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
   }
 
   for (const opp of opportunities) {
-    // Edge threshold
-    if (opp.edge < MIN_EDGE) {
-      details.push({ ...pick(opp), action: "skipped: edge below minimum" });
+    // Get current market data for accurate pricing
+    const { data: market } = await supabase
+      .from("markets")
+      .select("yes_ask, yes_bid, volume, open_interest")
+      .eq("ticker", opp.ticker)
+      .single();
+
+    // Calculate actual entry price (what we'd pay as a taker)
+    const entryPrice = opp.side === "yes"
+      ? (market?.yes_ask ?? opp.fair_value * 100) / 100
+      : (100 - (market?.yes_bid ?? (1 - opp.fair_value) * 100)) / 100;
+
+    // --- GUARDRAIL: Entry price safety ---
+    if (!isEntryPriceSafe(entryPrice, opp.strategy_id)) {
+      details.push({ ...pick(opp), action: `skipped: entry price ${(entryPrice * 100).toFixed(0)}¢ outside safe range` });
+      skipped++;
+      continue;
+    }
+
+    // --- GUARDRAIL: Edge must clear fees ---
+    const minEdge = minEdgeAfterFees(entryPrice);
+    if (opp.edge < minEdge) {
+      details.push({ ...pick(opp), action: `skipped: edge ${(opp.edge * 100).toFixed(1)}¢ < min ${(minEdge * 100).toFixed(1)}¢ (fees + buffer)` });
       skipped++;
       continue;
     }
@@ -143,11 +168,31 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
       continue;
     }
 
-    // Position sizing: max 10% of portfolio
-    const maxCost = STARTING_BALANCE * MAX_PORTFOLIO_FRACTION;
-    const quantity = Math.min(opp.quantity, Math.floor(maxCost / Math.max(opp.fair_value, 0.01)));
-    if (quantity <= 0 || availableCapital < quantity * 0.01) {
+    // --- POSITION SIZING: fee-aware, liquidity-aware, realistic ---
+    const volume = market?.volume ?? opp.quantity;
+    const oi = market?.open_interest ?? 0;
+    const quantity = sizePosition({
+      entryPriceNorm: entryPrice,
+      edge: opp.edge,
+      volume24h: volume,
+      openInterest: oi,
+      availableCapital,
+      portfolioValue: STARTING_BALANCE,
+    });
+
+    const cost = Math.round(quantity * entryPrice * 100) / 100;
+    const fee = takerFee(quantity, entryPrice);
+
+    if (cost + fee > availableCapital || quantity <= 0) {
       details.push({ ...pick(opp), action: "skipped: insufficient capital" });
+      skipped++;
+      continue;
+    }
+
+    // --- GUARDRAIL: Expected value must be positive ---
+    const ev = expectedValue(quantity, entryPrice, opp.fair_value);
+    if (ev <= 0) {
+      details.push({ ...pick(opp), action: `skipped: negative EV ($${ev.toFixed(2)}) after fees` });
       skipped++;
       continue;
     }
@@ -161,7 +206,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
         confidence: opp.confidence,
         fair_value: opp.fair_value,
         edge: opp.edge,
-        reasoning: opp.reasoning,
+        reasoning: opp.reasoning + ` | Fee: ${(fee * 100).toFixed(0)}¢, EV: $${ev.toFixed(2)}, Qty: ${quantity}`,
         status: "pending",
         strategy_id: opp.strategy_id,
       })
@@ -174,28 +219,17 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
     }
     predictionsWritten++;
 
-    // Get current market price for accurate cost calculation
-    const { data: market } = await supabase
-      .from("markets")
-      .select("yes_ask, yes_bid")
-      .eq("ticker", opp.ticker)
-      .single();
+    // Execute paper trade (cost includes fee for realistic paper trading)
+    const totalCost = Math.round((cost + fee) * 100) / 100;
 
-    const price = opp.side === "yes"
-      ? (market?.yes_ask ?? opp.fair_value * 100) / 100
-      : (100 - (market?.yes_bid ?? (1 - opp.fair_value) * 100)) / 100;
-
-    const cost = Math.round(quantity * price * 100) / 100;
-
-    // Execute paper trade
     const { error: tradeError } = await supabase
       .from("paper_trades")
       .insert({
         ticker: opp.ticker,
         side: opp.side,
         quantity,
-        price: Math.round(price * 10000) / 10000,
-        cost,
+        price: Math.round(entryPrice * 10000) / 10000,
+        cost: totalCost,
         status: "open",
         prediction_id: prediction.id,
         strategy_id: opp.strategy_id,
@@ -207,7 +241,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
     }
     tradesPlaced++;
 
-    // Add to watchlist (ignore if already exists)
+    // Add to watchlist for price tracking
     await supabase
       .from("watchlist")
       .upsert(
@@ -217,7 +251,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
 
     openByStrategy.set(opp.strategy_id, strategyOpen + 1);
     openByTicker.add(opp.ticker);
-    details.push({ ...pick(opp), action: "traded" });
+    details.push({ ...pick(opp), action: `traded: ${quantity}x @ ${(entryPrice * 100).toFixed(0)}¢, cost=$${totalCost}, EV=$${ev.toFixed(2)}` });
   }
 
   return { trades_placed: tradesPlaced, predictions_written: predictionsWritten, skipped, details };

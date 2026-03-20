@@ -1,5 +1,6 @@
 import type { Market } from "@/lib/supabase/types";
 import type { Strategy, Opportunity, ScanContext, StrategyConfig } from "./types";
+import { isEntryPriceSafe, minEdgeAfterFees, riskRewardRatio } from "./kalshi-math";
 
 const STRATEGY_ID = "stale-price";
 const DEFAULT_CONFIG = {
@@ -101,6 +102,16 @@ export const stalePrice: Strategy = {
         const edge = Math.abs(fairValue - lastPrice);
         if (edge < 0.05) continue;
 
+        // Entry price = what we'd pay as taker
+        const entryPrice = side === "yes"
+          ? (m.yes_ask != null ? m.yes_ask / 100 : lastPrice)
+          : (m.yes_bid != null ? (100 - m.yes_bid) / 100 : 1 - lastPrice);
+
+        // Guardrails
+        if (!isEntryPriceSafe(entryPrice, STRATEGY_ID)) continue;
+        if (riskRewardRatio(entryPrice) < 0.20) continue;
+        if (edge < minEdgeAfterFees(entryPrice)) continue;
+
         opportunities.push({
           ticker: m.ticker,
           event_ticker: eventTicker,
@@ -110,7 +121,7 @@ export const stalePrice: Strategy = {
           confidence: Math.min(0.5 + edge * 0.5, 0.75),
           fair_value: Math.round(fairValue * 10000) / 10000,
           edge: Math.round(edge * 10000) / 10000,
-          reasoning: `Stale price: sibling markets settled (${settledResults}) but ${m.ticker} hasn't repriced. Last=${(lastPrice * 100).toFixed(0)}¢, price range last ${snapshots.length} snapshots: ${priceRange}¢. Fair value estimate: ${(fairValue * 100).toFixed(0)}¢.`,
+          reasoning: `Stale price: siblings settled (${settledResults}) but ${m.ticker} hasn't repriced. Last=${(lastPrice * 100).toFixed(0)}¢ → FV=${(fairValue * 100).toFixed(0)}¢. Entry=${(entryPrice * 100).toFixed(0)}¢ ${side.toUpperCase()}. R/R=${riskRewardRatio(entryPrice).toFixed(2)}. Vol=${m.volume}.`,
           quantity: 10,
         });
       }
