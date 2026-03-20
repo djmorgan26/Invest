@@ -67,7 +67,7 @@ export const stalePrice: Strategy = {
           .order("snapshot_at", { ascending: false })
           .limit(10);
 
-        if (!snapshots || snapshots.length < 2) continue;
+        if (!snapshots || snapshots.length < 1) continue;
 
         // Check price stability — if price hasn't moved > 2¢ in recent snapshots
         const prices = snapshots.map((s) => s.last_price);

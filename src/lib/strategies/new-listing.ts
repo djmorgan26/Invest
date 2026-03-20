@@ -21,7 +21,7 @@ import { isEntryPriceSafe, takerFee, minEdgeAfterFees, riskRewardRatio } from ".
 
 const STRATEGY_ID = "new-listing";
 const DEFAULT_CONFIG = {
-  max_hours_since_listing: 24, // only newly listed markets
+  max_hours_since_listing: 48, // recently listed markets
   min_spread: 0.06,            // wide spread = no market maker yet = opportunity
   min_volume: 5,               // some activity (not completely dead)
   max_volume: 500,             // not already well-discovered

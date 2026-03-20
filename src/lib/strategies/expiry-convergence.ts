@@ -124,9 +124,12 @@ export const expiryConvergence: Strategy = {
         hasMomentum = Math.abs(priceMoveNorm) >= config.min_momentum;
       }
 
-      // Skip if no clear signal (no momentum AND no resolved siblings)
+      // Check if siblings have resolved (strong signal)
       const hasResolvedSiblings = eventsWithResolutions.has(m.event_ticker);
-      if (!hasMomentum && !hasResolvedSiblings) continue;
+
+      // Allow strong price lean (>60¢ or <40¢) as a signal even without momentum/siblings
+      const hasStrongLean = lastPrice > 0.60 || lastPrice < 0.40;
+      if (!hasMomentum && !hasResolvedSiblings && !hasStrongLean) continue;
 
       // Determine trade direction based on signals
       let side: "yes" | "no";

@@ -67,7 +67,9 @@ export async function GET(request: NextRequest) {
         (trade.side === "yes" && result === "yes") ||
         (trade.side === "no" && result === "no");
       const exitPrice = won ? 1 : 0;
-      const pnl = (exitPrice - trade.price) * trade.quantity;
+      // PnL includes entry fee: profit = (exit - entry) * qty - fee
+      const fee = trade.fee ?? 0;
+      const pnl = (exitPrice - trade.price) * trade.quantity - fee;
 
       const { error: updateError } = await supabase
         .from("paper_trades")

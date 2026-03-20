@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       .not("yes_bid", "is", null)
       .not("last_price", "is", null)
       .order("volume", { ascending: false })
-      .limit(200);
+      .limit(500);
 
     let dbSnapshotsCreated = 0;
     if (!topError && topMarkets && topMarkets.length > 0) {

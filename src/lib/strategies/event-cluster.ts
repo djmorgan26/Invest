@@ -4,7 +4,7 @@ import { isEntryPriceSafe, minEdgeAfterFees, riskRewardRatio } from "./kalshi-ma
 
 const STRATEGY_ID = "event-cluster";
 const DEFAULT_CONFIG = {
-  min_mispricing: 0.05, // 5¢ minimum deviation from expected sum
+  min_mispricing: 0.03, // 3¢ minimum deviation from expected sum
   max_markets_per_event: 15, // skip events with too many granular markets
   min_volume: 20, // minimum volume per market
   max_entry_price: 0.85,

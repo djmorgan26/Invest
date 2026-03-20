@@ -133,8 +133,9 @@ export const liquidityProvision: Strategy = {
       const midpoint = (yesBid + yesAsk) / 2;
 
       // Volatility filter: skip markets with large recent price swings
+      // If no snapshots exist, assume stable (allow through)
       const vol = tickerVolatility.get(m.ticker);
-      if (vol && vol.count >= 3) {
+      if (vol && vol.count >= 2) {
         const priceRange = vol.max - vol.min;
         if (priceRange > config.max_price_volatility) continue;
       }

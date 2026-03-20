@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
         opportunities_found: scanResult.opportunities.length,
         strategies_run: scanResult.strategiesRun,
         strategies_skipped: scanResult.strategiesSkipped,
+        per_strategy: scanResult.perStrategy,
       },
       trades: {
         placed: tradeResult.trades_placed,

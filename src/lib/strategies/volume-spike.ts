@@ -4,7 +4,7 @@ import { isEntryPriceSafe, minEdgeAfterFees, riskRewardRatio } from "./kalshi-ma
 
 const STRATEGY_ID = "volume-spike";
 const DEFAULT_CONFIG = {
-  volume_multiplier: 3.0, // 3x baseline volume = spike
+  volume_multiplier: 2.0, // 2x baseline volume = spike
   min_price_move: 0.03, // 3¢ minimum accompanying price move
   momentum_factor: 0.3, // fair value = current + move * factor
   lookback_hours: 48, // baseline window
@@ -84,7 +84,7 @@ export const volumeSpike: Strategy = {
 
     for (const m of openMarkets) {
       const data = tickerData.get(m.ticker);
-      if (!data || data.volumes.length < 3) continue; // need baseline data
+      if (!data || data.volumes.length < 2) continue; // need baseline data
 
       // Calculate baseline average volume
       const baselineAvg = data.volumes.reduce((a, b) => a + b, 0) / data.volumes.length;

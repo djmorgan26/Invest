@@ -43,6 +43,7 @@ export async function scanAll(): Promise<{
   opportunities: Opportunity[];
   strategiesRun: string[];
   strategiesSkipped: string[];
+  perStrategy: Record<string, number>;
 }> {
   const supabase = createServerClient();
 
@@ -68,11 +69,12 @@ export async function scanAll(): Promise<{
     .limit(5000);
 
   if (!markets || markets.length === 0) {
-    return { opportunities: [], strategiesRun, strategiesSkipped };
+    return { opportunities: [], strategiesRun, strategiesSkipped, perStrategy: {} };
   }
 
   // Check for performance decay before running each strategy
   const allOpportunities: Opportunity[] = [];
+  const perStrategy: Record<string, number> = {};
 
   for (const strategy of ALL_STRATEGIES) {
     if (!enabledIds.has(strategy.id)) {
@@ -101,9 +103,11 @@ export async function scanAll(): Promise<{
     try {
       const opps = await strategy.scan(markets as Market[], { supabase });
       allOpportunities.push(...opps);
+      perStrategy[strategy.id] = opps.length;
       strategiesRun.push(strategy.id);
     } catch (err) {
       console.error(`Strategy ${strategy.id} failed:`, err);
+      perStrategy[strategy.id] = -1;
       strategiesSkipped.push(strategy.id);
     }
   }
@@ -129,6 +133,7 @@ export async function scanAll(): Promise<{
     opportunities: allOpportunities.sort((a, b) => b.edge - a.edge),
     strategiesRun,
     strategiesSkipped,
+    perStrategy,
   };
 }
 
