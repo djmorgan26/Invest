@@ -64,14 +64,20 @@ The system runs autonomously via GitHub Actions cron jobs (`.github/workflows/cr
 
 ## Strategies
 
-Four autonomous strategies scan for opportunities:
+Ten autonomous strategies scan for opportunities:
 
 | Strategy | Logic | Key Params |
 |----------|-------|------------|
 | **Wide Spread** | Buy in markets with bid-ask spread > threshold | `min_spread`, `min_volume`, `max_days_to_close` |
 | **Stale Price** | Detect markets that haven't repriced after sibling settlement | `max_hours_since_settlement` |
-| **Extreme Value** | Buy near-certain outcomes priced < 5¢ or > 95¢ near expiry | `low_threshold`, `high_threshold`, `max_days_to_close` |
-| **Mean Reversion** | Bet against sharp price moves > 15¢ in 24h | `min_move`, `lookback_hours`, `reversion_factor` |
+| **Extreme Value** | Buy near-certain outcomes priced < 8¢ or > 92¢ near expiry | `low_threshold`, `high_threshold`, `max_days_to_close` |
+| **Mean Reversion** | Bet against sharp price moves > 12¢ in 24h | `min_move`, `lookback_hours`, `reversion_factor` |
+| **Volume Spike** | Momentum continuation on 3x volume spikes with price moves | `volume_multiplier`, `min_price_move`, `momentum_factor` |
+| **Event Cluster Arb** | Exploit mutually exclusive markets where YES prices ≠ 100¢ | `min_mispricing`, `max_markets_per_event` |
+| **Favorite-Longshot** | Sell overpriced longshots (5-15¢), buy underpriced favorites (85-95¢) | `longshot_overpricing`, `favorite_underpricing` |
+| **Expiry Convergence** | Snipe markets <48h from close still priced 25-75¢ with momentum | `max_hours_to_close`, `min_momentum` |
+| **New Listing Edge** | Trade newly listed markets (<24h) with naive pricing | `max_hours_since_listing`, `min_spread` |
+| **Liquidity Provision** | Capture spread in stable wide-spread markets using orderbook depth | `min_spread`, `max_price_volatility`, `min_depth_ratio` |
 
 ### Strategy Engine Rules
 - **Minimum edge:** $0.05 (fair value vs. market price)

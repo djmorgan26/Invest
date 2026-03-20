@@ -14,6 +14,10 @@ import { extremeValue } from "./extreme-value";
 import { meanReversion } from "./mean-reversion";
 import { volumeSpike } from "./volume-spike";
 import { eventCluster } from "./event-cluster";
+import { favoriteLongshot } from "./favorite-longshot";
+import { expiryConvergence } from "./expiry-convergence";
+import { newListing } from "./new-listing";
+import { liquidityProvision } from "./liquidity-provision";
 import { estimateSlippageYes, estimateSlippageNo } from "./slippage";
 import type { DepthLevel } from "./slippage";
 
@@ -24,6 +28,10 @@ const ALL_STRATEGIES: Strategy[] = [
   meanReversion,
   volumeSpike,
   eventCluster,
+  favoriteLongshot,
+  expiryConvergence,
+  newListing,
+  liquidityProvision,
 ];
 
 const STARTING_BALANCE = 10000;

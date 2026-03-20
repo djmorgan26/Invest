@@ -86,7 +86,7 @@ export function isEntryPriceSafe(
   entryPriceNorm: number,
   strategyId?: string,
 ): boolean {
-  const maxEntry = strategyId === "extreme-value" ? 0.92 : 0.85;
+  const maxEntry = (strategyId === "extreme-value" || strategyId === "favorite-longshot") ? 0.92 : 0.85;
   const minEntry = 0.08; // avoid longshot bias
   return entryPriceNorm >= minEntry && entryPriceNorm <= maxEntry;
 }
