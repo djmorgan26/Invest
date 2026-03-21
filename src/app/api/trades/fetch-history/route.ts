@@ -27,10 +27,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, fetched: 0, message: "No settled markets" });
     }
 
-    // Check which already have trades
+    // Check which settled markets already have trades by querying just their tickers
+    const settledTickers = settledMarkets.map((m: { ticker: string }) => m.ticker);
     const { data: existing } = await supabase
       .from("market_trades")
-      .select("ticker");
+      .select("ticker")
+      .in("ticker", settledTickers.slice(0, 500));
 
     const existingTickers = new Set((existing ?? []).map((t: { ticker: string }) => t.ticker));
     const toFetch = settledMarkets

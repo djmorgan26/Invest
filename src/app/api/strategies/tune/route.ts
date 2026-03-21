@@ -31,6 +31,20 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
+    // Log error to sync_log for operational visibility
+    try {
+      const supabase = createServerClient();
+      await supabase.from("sync_log").insert({
+        type: "strategy_tune",
+        status: "error",
+        records_processed: 0,
+        error_message: message,
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+      });
+    } catch {
+      // Don't let logging failure mask the real error
+    }
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

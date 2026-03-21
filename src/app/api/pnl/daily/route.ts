@@ -3,10 +3,10 @@ import { createServerClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
+    // Auth: if an Authorization header is provided, it must match CRON_SECRET.
+    // Requests without auth header are allowed (dashboard access).
     const authHeader = request.headers.get("authorization");
-    const cron = process.env.CRON_SECRET;
-    // Allow both cron auth and unauthenticated dashboard access
-    if (cron && authHeader && authHeader !== `Bearer ${cron}`) {
+    if (authHeader && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
         win_rate: { value: winRate, threshold: 0.55, met: winRate >= 0.55 },
         total_pnl: { value: Math.round(totalPnl * 100) / 100, threshold: 0, met: totalPnl > 0 },
         sharpe: { value: Math.round(sharpe * 100) / 100, threshold: 1.0, met: sharpe >= 1.0 },
-        max_drawdown: { value: Math.round(maxDrawdown * 10000) / 100, threshold: 15, met: maxDrawdown * 100 <= 15 },
+        max_drawdown: { value: Math.round(maxDrawdown * 100 * 100) / 100, threshold: 15, met: maxDrawdown * 100 <= 15 },
         worst_strategy_loss: { value: Math.round(worstStrategyLoss * 100) / 100, threshold: -500, met: worstStrategyLoss > -500 },
       },
       daily: Array.from(dailyPnl.values()).sort((a, b) => b.date.localeCompare(a.date)),

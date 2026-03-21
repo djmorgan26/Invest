@@ -149,9 +149,9 @@ export async function GET() {
       total_pnl: { value: Math.round(totalPnl * 100) / 100, target: 0, met: totalPnl > 0 },
       sharpe: { value: Math.round(annualizedSharpe * 100) / 100, target: 1.0, met: annualizedSharpe > 1.0 },
       max_drawdown_pct: {
-        value: Math.round((maxDrawdown / 10000) * 10000) / 100,
+        value: Math.round((maxDrawdown / 10000) * 100 * 100) / 100, // percentage of $10k portfolio
         target: 15,
-        met: maxDrawdown / 10000 < 0.15,
+        met: (maxDrawdown / 10000) * 100 < 15,
       },
     };
 
