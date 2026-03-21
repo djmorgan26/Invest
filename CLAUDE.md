@@ -33,6 +33,9 @@ AI-powered prediction market analysis tool. Syncs Kalshi markets, tracks prices,
 | Resolve trades | `npx tsx src/scripts/resolve-trades.ts` |
 | **Run strategies** | `npx tsx src/scripts/run-strategies.ts` |
 | **Review performance** | `npx tsx src/scripts/review-performance.ts` |
+| **Fetch trade history** | `npx tsx src/scripts/fetch-historical-trades.ts --max=200` |
+| **Backtest strategies** | `npx tsx src/scripts/backtest-historical.ts --strategy all --period 3m` |
+| **Parameter sweep** | `npx tsx src/scripts/backtest-historical.ts --strategy wide-spread --sweep` |
 
 ## Claude Code Slash Commands
 
@@ -45,8 +48,11 @@ Use these for structured analysis sessions:
 | `/project:new-strategy` | Design and implement a new strategy | When patterns suggest a new approach |
 | `/project:market-scan` | Manual intelligent scan for opportunities | When looking beyond what automation finds |
 | `/project:health-check` | System operational verification | When something seems off, or weekly check |
+| `/project:optimize` | **Autonomous strategy optimizer** | When you want AI to backtest, sweep, calibrate, and improve everything |
 
 **Skill: `kalshi-advisor`** — The primary check-in tool. Auto-triggers when working with strategy files, plan docs, or review files. Runs a full strategic advisor session: health check, performance review, market scan, strategic decisions, and persists learnings. Use this every 2-3 days during data collection phase.
+
+**Skill: `strategy-optimizer`** — The autonomous optimization engine. This is the AI brain that decides what to do: fetch historical data, backtest strategies against real settled markets, run parameter sweeps, measure prediction calibration, and push the system toward go-live readiness. Invoke with `/project:optimize` or it auto-triggers on backtest/optimization discussions.
 
 ## Autonomous Operation
 
@@ -61,6 +67,7 @@ The system runs autonomously via GitHub Actions cron jobs (`.github/workflows/cr
 | **Portfolio snapshot** | Every 1h | Compute and store portfolio value |
 | **Strategy tuning** | Weekly (Sun) | Auto-adjust strategy parameters based on results |
 | **Orderbook snapshot** | Every 5 min | Capture order book depth for watchlisted tickers |
+| **Trade history fetch** | Daily (2am) | Fetch trade history for settled markets for backtesting |
 
 ## Strategies
 
@@ -142,6 +149,48 @@ API endpoint returning comprehensive JSON report. Also stored in `reviews` table
 | Max drawdown | < 15% of portfolio |
 | Consistent over | 2+ weeks |
 
+## Historical Backtesting
+
+The system can backtest strategies against real historical data from settled markets.
+
+### How It Works
+1. **Fetch trade history**: `fetch-historical-trades.ts` pulls individual trades from the Kalshi API for settled markets and stores them in `market_trades` + builds OHLCV candles in `market_candles`
+2. **Reconstruct market state**: `snapshot-reconstructor.ts` rebuilds what a market looked like at any historical point in time using trade data — producing `Market` objects our strategies can consume
+3. **Run strategies**: The backtester calls `strategy.scan()` with reconstructed market snapshots at multiple time points before settlement, then checks if the predicted side matched the actual result
+4. **Measure performance**: Computes win rate, PnL, Sharpe ratio, max drawdown, profit factor — all with realistic fee modeling
+
+### Backtest Commands
+```bash
+# Fetch historical trade data (run first, builds up over time)
+npx tsx src/scripts/fetch-historical-trades.ts --max=200 --min-volume=100
+
+# Backtest all strategies over last 3 months
+npx tsx src/scripts/backtest-historical.ts --strategy all --period 3m
+
+# Backtest specific strategy with verbose trade log
+npx tsx src/scripts/backtest-historical.ts --strategy wide-spread --period 6m --verbose
+
+# Parameter sweep to find optimal config
+npx tsx src/scripts/backtest-historical.ts --strategy mean-reversion --sweep
+
+# Backtest specific category only
+npx tsx src/scripts/backtest-historical.ts --strategy all --period 3m --category politics
+```
+
+### Key Files
+- `src/lib/backtesting/engine.ts` — Core backtest engine
+- `src/lib/backtesting/snapshot-reconstructor.ts` — Market state reconstruction
+- `src/lib/backtesting/param-sweep.ts` — Parameter optimization
+- `src/lib/backtesting/calibration.ts` — Prediction accuracy measurement
+- `src/scripts/fetch-historical-trades.ts` — Historical data collection
+- `src/scripts/backtest-historical.ts` — CLI runner
+
+### DB Tables (4 new)
+- `market_trades` — Individual trade history from Kalshi API
+- `market_candles` — OHLCV candles built from trade history
+- `backtest_results` — Stored backtest results with configs
+- `prediction_calibration` — Calibration metrics per strategy
+
 ## Architecture
 ```
 src/
@@ -149,6 +198,7 @@ src/
     markets/sync/             # Sync all active markets + events
     prices/snapshot/          # Snapshot watchlist + top 200 volume markets
     trades/resolve/           # Settle open paper trades
+    trades/fetch-history/     # Fetch historical trade data (daily)
     strategies/scan/          # Run strategies + auto-trade (every 5 min)
     strategies/tune/          # Auto-tune parameters (weekly)
     portfolio/snapshot/       # Portfolio value tracking (hourly)
@@ -165,6 +215,12 @@ src/
       stale-price.ts          # Stale price strategy
       extreme-value.ts        # Extreme value strategy
       mean-reversion.ts       # Mean reversion strategy
+    backtesting/              # Historical backtesting engine
+      engine.ts               # Core backtest runner
+      snapshot-reconstructor.ts # Rebuild market state from trades
+      param-sweep.ts          # Parameter grid optimization
+      calibration.ts          # Prediction accuracy analysis
+      index.ts                # Module exports
     intelligence/             # Self-optimizing intelligence layer
       context.ts              # Market data aggregation
       categories.ts           # Category performance tracking
@@ -174,6 +230,8 @@ src/
   scripts/                    # CLI entry points
     run-strategies.ts         # Local strategy runner
     review-performance.ts     # Comprehensive report (writes to reviews table)
+    fetch-historical-trades.ts # Fetch + store trade history from Kalshi
+    backtest-historical.ts    # Run backtests / parameter sweeps
   app/dashboard/
     strategies/page.tsx       # Strategy performance + learnings view
     reviews/page.tsx          # Reviews & learnings history
@@ -204,7 +262,7 @@ docs/
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `CRON_SECRET`
 
-## DB Tables (13 total)
+## DB Tables (17 total)
 - `events` — Event catalog
 - `markets` — Market data (43K+ synced)
 - `price_snapshots` — Price history time series
@@ -218,3 +276,7 @@ docs/
 - `market_context` — News, sentiment, catalysts cache
 - `reviews` — Structured review reports with recommendations
 - `orderbook_snapshots` — Order book depth history (bid/ask levels)
+- `market_trades` — Individual trade history from Kalshi API
+- `market_candles` — OHLCV candles built from trade data
+- `backtest_results` — Stored backtest results with strategy configs
+- `prediction_calibration` — Prediction accuracy metrics per strategy

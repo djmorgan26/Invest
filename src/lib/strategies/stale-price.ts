@@ -99,13 +99,14 @@ export const stalePrice: Strategy = {
           continue;
         }
 
-        const edge = Math.abs(fairValue - lastPrice);
-        if (edge < 0.05) continue;
-
         // Entry price = what we'd pay as taker
         const entryPrice = side === "yes"
           ? (m.yes_ask != null ? m.yes_ask / 100 : lastPrice)
           : (m.yes_bid != null ? (100 - m.yes_bid) / 100 : 1 - lastPrice);
+
+        // Edge = fair value minus what we actually pay (not market price)
+        const edge = fairValue - entryPrice;
+        if (edge < 0.05) continue;
 
         // Guardrails
         if (!isEntryPriceSafe(entryPrice, STRATEGY_ID)) continue;

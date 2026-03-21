@@ -3,8 +3,13 @@ import { getAllActiveMarkets, getEvent } from "@/lib/kalshi/client";
 import { createServerClient } from "@/lib/supabase/server";
 import { dollarsToCents, fpToInt } from "@/lib/kalshi/types";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get("authorization");
+    if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const startedAt = new Date().toISOString();
     const supabase = createServerClient();
 

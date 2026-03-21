@@ -7,6 +7,8 @@ const DEFAULT_CONFIG = {
   min_move: 0.12, // lowered from 0.15 to catch more opportunities
   lookback_hours: 24,
   reversion_factor: 0.5,
+  min_days_to_close: 1, // need time for reversion to happen
+  max_days_to_close: 14, // don't bet on very distant markets
 };
 
 function getConfig(dbConfig: StrategyConfig) {
@@ -74,8 +76,22 @@ export const meanReversion: Strategy = {
 
       if (absMove < config.min_move) continue;
 
-      // Predict partial reversion
-      const reversionAmount = absMove * config.reversion_factor;
+      // Time filter
+      const daysToClose = m.close_time
+        ? (new Date(m.close_time).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        : null;
+
+      if (daysToClose != null && daysToClose < config.min_days_to_close) continue;
+      if (daysToClose != null && daysToClose > config.max_days_to_close) continue;
+
+      // Time-to-expiry scaling: moves near expiry are less likely to revert
+      // (they're more likely informed). Reduce reversion factor for <3 day markets.
+      let adjustedReversionFactor = config.reversion_factor;
+      if (daysToClose != null && daysToClose < 3) {
+        adjustedReversionFactor *= 0.5 + (daysToClose / 3) * 0.5;
+      }
+
+      const reversionAmount = absMove * adjustedReversionFactor;
       let side: "yes" | "no";
       let fairValue: number;
       let entryPrice: number;
@@ -101,19 +117,13 @@ export const meanReversion: Strategy = {
       // Risk/reward check
       if (riskRewardRatio(entryPrice) < 0.20) continue;
 
-      const edge = side === "yes"
-        ? fairValue - entryPrice
-        : fairValue - (1 - currentPrice);
+      // Edge = fair value of the side we're buying minus what we pay
+      // For YES: fairValue is P(yes), entryPrice is cost of YES contract
+      // For NO: fairValue is P(no), entryPrice is cost of NO contract
+      const edge = fairValue - entryPrice;
 
       // Edge must clear fees
       if (edge < minEdgeAfterFees(entryPrice)) continue;
-
-      const daysToClose = m.close_time
-        ? (new Date(m.close_time).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-        : null;
-
-      // Skip if market closes too soon (need time for reversion)
-      if (daysToClose != null && daysToClose < 0.5) continue;
 
       opportunities.push({
         ticker: m.ticker,
