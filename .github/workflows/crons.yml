@@ -14,6 +14,8 @@ on:
     - cron: '0 * * * *'
     # Strategy tuning — weekly Sunday midnight
     - cron: '0 0 * * 0'
+    # Historical trade fetch — daily at 2am
+    - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
       job:
@@ -28,6 +30,7 @@ on:
           - portfolio
           - tune
           - orderbook
+          - fetch-history
           - all
 
 jobs:
@@ -133,5 +136,20 @@ jobs:
           cat /tmp/response.txt
           if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
             echo "::error::HTTP $HTTP_CODE from /api/orderbook/snapshot"
+            exit 1
+          fi
+
+  fetch-history:
+    if: github.event.schedule == '0 2 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'fetch-history' || inputs.job == 'all'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch historical trade data
+        run: |
+          HTTP_CODE=$(curl -sS --max-time 280 -o /tmp/response.txt -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/trades/fetch-history")
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::HTTP $HTTP_CODE from /api/trades/fetch-history"
             exit 1
           fi

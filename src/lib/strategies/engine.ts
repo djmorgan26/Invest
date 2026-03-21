@@ -129,8 +129,19 @@ export async function scanAll(): Promise<{
     }
   }
 
+  // Deduplicate: when multiple strategies flag the same ticker,
+  // keep only the opportunity with the highest edge
+  const bestByTicker = new Map<string, Opportunity>();
+  for (const opp of allOpportunities) {
+    const existing = bestByTicker.get(opp.ticker);
+    if (!existing || opp.edge > existing.edge) {
+      bestByTicker.set(opp.ticker, opp);
+    }
+  }
+  const deduped = Array.from(bestByTicker.values());
+
   return {
-    opportunities: allOpportunities.sort((a, b) => b.edge - a.edge),
+    opportunities: deduped.sort((a, b) => b.edge - a.edge),
     strategiesRun,
     strategiesSkipped,
     perStrategy,
