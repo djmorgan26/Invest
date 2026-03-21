@@ -180,7 +180,8 @@ export async function storeCalibration(
 ): Promise<void> {
   for (const report of reports) {
     for (const bucket of report.buckets) {
-      await supabase.from("prediction_calibration").insert({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("prediction_calibration").insert({
         strategy_id: report.strategy_id,
         confidence_bucket: (bucket.confidence_low + bucket.confidence_high) / 2,
         total_predictions: bucket.total,
