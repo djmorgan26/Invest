@@ -117,9 +117,10 @@ export const meanReversion: Strategy = {
       // Risk/reward check
       if (riskRewardRatio(entryPrice) < 0.20) continue;
 
-      const edge = side === "yes"
-        ? fairValue - entryPrice
-        : fairValue - (1 - currentPrice);
+      // Edge = fair value of the side we're buying minus what we pay
+      // For YES: fairValue is P(yes), entryPrice is cost of YES contract
+      // For NO: fairValue is P(no), entryPrice is cost of NO contract
+      const edge = fairValue - entryPrice;
 
       // Edge must clear fees
       if (edge < minEdgeAfterFees(entryPrice)) continue;

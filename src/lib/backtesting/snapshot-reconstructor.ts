@@ -84,23 +84,25 @@ export function reconstructMarketAt(
       yesAsk = Math.round(buyPrices.reduce((s, p) => s + p, 0) / buyPrices.length);
       // Bid = average of taker-sell prices (they hit the bid)
       yesBid = Math.round(sellPrices.reduce((s, p) => s + p, 0) / sellPrices.length);
-      // Ensure bid <= ask
-      if (yesBid > yesAsk) {
-        const mid = Math.round((yesBid + yesAsk) / 2);
-        yesBid = mid - 1;
-        yesAsk = mid + 1;
-      }
     } else {
-      // Estimate spread from price variance
+      // Estimate from price variance of all recent trades
       const prices = recentTrades.map((t) => t.yes_price);
-      const min = Math.min(...prices);
-      const max = Math.max(...prices);
-      yesBid = min;
-      yesAsk = max;
-      if (yesBid === yesAsk) {
-        yesBid = Math.max(1, lastPrice - 2);
-        yesAsk = Math.min(99, lastPrice + 2);
-      }
+      yesBid = Math.min(...prices);
+      yesAsk = Math.max(...prices);
+    }
+
+    // Enforce minimum realistic spread of 3¢ (Kalshi markets always have some spread)
+    const MIN_SPREAD = 3;
+    if (yesAsk - yesBid < MIN_SPREAD) {
+      const mid = Math.round((yesBid + yesAsk) / 2);
+      yesBid = Math.max(1, mid - Math.ceil(MIN_SPREAD / 2));
+      yesAsk = Math.min(99, mid + Math.ceil(MIN_SPREAD / 2));
+    }
+    // Ensure bid <= ask
+    if (yesBid > yesAsk) {
+      const mid = Math.round((yesBid + yesAsk) / 2);
+      yesBid = mid - 1;
+      yesAsk = mid + 1;
     }
   } else {
     // Very few trades — assume a wide spread

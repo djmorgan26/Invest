@@ -163,28 +163,46 @@ function compositeScore(stats: BacktestStats): number {
 
 /**
  * Create a strategy instance that uses specific config overrides.
- * The trick: we write the config to the DB before scanning.
+ * Uses a proxy to intercept config queries instead of writing to DB
+ * (which would corrupt live strategy configs during sweeps).
  */
 function createConfiguredStrategy(
   original: Strategy,
   configOverride: StrategyConfig,
-  supabase: ReturnType<typeof import("@supabase/supabase-js").createClient>
+  _supabase: ReturnType<typeof import("@supabase/supabase-js").createClient>
 ): Strategy {
   return {
     id: original.id,
     name: original.name,
     async scan(markets, context) {
-      // Write temporary config
-      await supabase
-        .from("strategies")
-        .update({ config: configOverride })
-        .eq("id", original.id);
-
-      try {
-        return await original.scan(markets, context);
-      } finally {
-        // Note: in sweeps we don't restore since we'll overwrite next iteration
-      }
+      // Intercept the strategy config query to return our override
+      const proxiedContext = {
+        supabase: new Proxy(context.supabase, {
+          get(target, prop) {
+            if (prop === "from") {
+              return (table: string) => {
+                if (table === "strategies") {
+                  // Return a mock query that yields our config override
+                  return {
+                    select: () => ({
+                      eq: () => ({
+                        single: () =>
+                          Promise.resolve({
+                            data: { config: configOverride },
+                            error: null,
+                          }),
+                      }),
+                    }),
+                  };
+                }
+                return target.from(table);
+              };
+            }
+            return (target as Record<string, unknown>)[prop as string];
+          },
+        }),
+      };
+      return await original.scan(markets, proxiedContext);
     },
   };
 }

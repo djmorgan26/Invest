@@ -370,6 +370,16 @@ async function main() {
     const allPass = checks.every((c) => c.pass);
     console.log(`\n  ${allPass ? "READY FOR LIVE TRADING" : "NOT READY — keep optimizing"}`);
 
+    // Calibration analysis
+    if (trades.length >= 10) {
+      const { analyzeCalibration, formatCalibrationReport, storeCalibration } = await import(
+        "@/lib/backtesting/calibration"
+      );
+      const calibReports = analyzeCalibration(trades);
+      console.log(formatCalibrationReport(calibReports));
+      await storeCalibration(calibReports, supabase);
+    }
+
     // Store results
     for (const stratId of strategyIds) {
       const stratTrades = trades.filter((t) => t.strategy_id === stratId);

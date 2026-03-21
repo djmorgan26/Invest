@@ -126,10 +126,13 @@ export const volumeSpike: Strategy = {
       // Risk/reward
       if (riskRewardRatio(entryPrice) < config.min_risk_reward) continue;
 
-      // Fair value: current price + momentum continuation
+      // Fair value: momentum continuation in the direction of the move
+      // YES: price going up → fair P(YES) = current + momentum
+      // NO: price going down → fair P(NO) = (1-current) + momentum
+      // Both sides: we're buying the winning direction, so fair value > entry price
       const fairValue = side === "yes"
-        ? Math.min(0.90, currentPrice + absPriceMove * config.momentum_factor)
-        : Math.min(0.90, (1 - currentPrice) + absPriceMove * config.momentum_factor);
+        ? Math.min(0.90, Math.max(0.10, currentPrice + absPriceMove * config.momentum_factor))
+        : Math.min(0.90, Math.max(0.10, (1 - currentPrice) + absPriceMove * config.momentum_factor));
 
       const edge = fairValue - entryPrice;
 

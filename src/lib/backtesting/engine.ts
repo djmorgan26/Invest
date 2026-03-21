@@ -161,8 +161,12 @@ export async function runHistoricalBacktest(
           // Take the best opportunity for this market
           const opp = opportunities[0];
 
-          // Apply slippage
-          const slippage = opp.edge * (cfg.slippageBps / 10000);
+          // Apply slippage (based on entry price, not edge)
+          const rawEntry =
+            opp.side === "yes"
+              ? (reconstructed.yes_ask ?? reconstructed.last_price ?? 50) / 100
+              : (100 - (reconstructed.yes_bid ?? reconstructed.last_price ?? 50)) / 100;
+          const slippage = rawEntry * (cfg.slippageBps / 10000);
           let entryPrice =
             opp.side === "yes"
               ? (reconstructed.yes_ask ?? reconstructed.last_price ?? 50) / 100
