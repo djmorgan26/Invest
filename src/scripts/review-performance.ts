@@ -2,6 +2,7 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { createClient } from "@supabase/supabase-js";
+import { wilsonScoreInterval, isWinRateSignificant } from "@/lib/stats/wilson";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -61,6 +62,8 @@ async function main() {
         price: t.price,
       }));
 
+      const ci = wilsonScoreInterval(wins, trades.length);
+
       strategyPerf.push({
         id: s.id,
         name: s.name,
@@ -71,6 +74,9 @@ async function main() {
         wins,
         losses: trades.length - wins,
         win_rate: trades.length > 0 ? Math.round((wins / trades.length) * 1000) / 10 + "%" : "N/A",
+        win_rate_ci_lower: Math.round(ci.lower * 1000) / 10,
+        win_rate_ci_upper: Math.round(ci.upper * 1000) / 10,
+        win_rate_significant: isWinRateSignificant(wins, trades.length, 0.50),
         total_pnl: Math.round(totalPnl * 100) / 100,
         avg_pnl: trades.length > 0 ? Math.round((totalPnl / trades.length) * 100) / 100 : 0,
         best_trades: best,
@@ -182,10 +188,15 @@ async function main() {
     const dailySharpe = stdDev > 0 ? avgReturn / stdDev : 0;
     const annualizedSharpe = dailySharpe * Math.sqrt(252);
 
+    const overallCi = wilsonScoreInterval(totalWins, totalResolved);
+
     report.overall = {
       total_resolved: totalResolved,
       total_wins: totalWins,
       win_rate: totalResolved > 0 ? Math.round((totalWins / totalResolved) * 1000) / 10 + "%" : "N/A",
+      win_rate_ci_lower: Math.round(overallCi.lower * 1000) / 10,
+      win_rate_ci_upper: Math.round(overallCi.upper * 1000) / 10,
+      win_rate_significant: isWinRateSignificant(totalWins, totalResolved, 0.50),
       total_pnl: Math.round(totalPnl * 100) / 100,
       max_drawdown: Math.round(maxDrawdown * 100) / 100,
       sharpe_ratio: Math.round(annualizedSharpe * 100) / 100,

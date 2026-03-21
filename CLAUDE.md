@@ -36,6 +36,9 @@ AI-powered prediction market analysis tool. Syncs Kalshi markets, tracks prices,
 | **Fetch trade history** | `npx tsx src/scripts/fetch-historical-trades.ts --max=200` |
 | **Backtest strategies** | `npx tsx src/scripts/backtest-historical.ts --strategy all --period 3m` |
 | **Parameter sweep** | `npx tsx src/scripts/backtest-historical.ts --strategy wide-spread --sweep` |
+| **Kill switch ON** | `npx tsx src/scripts/kill-switch.ts on "reason"` |
+| **Kill switch OFF** | `npx tsx src/scripts/kill-switch.ts off` |
+| **Circuit breaker status** | `npx tsx src/scripts/kill-switch.ts status` |
 
 ## Claude Code Slash Commands
 
@@ -104,6 +107,23 @@ The system improves over time through three mechanisms:
    - Markets/categories to focus on or avoid
 
 3. **Persistent learnings**: Insights are recorded to `strategy_learnings` with typed categories, creating a compounding knowledge base across sessions.
+
+## Circuit Breakers (`src/lib/strategies/circuit-breakers.ts`)
+
+Portfolio-level safety checks that run before every trade:
+
+| Breaker | Trigger | Effect |
+|---------|---------|--------|
+| **Kill Switch** | Manual activation via CLI or API | Halts ALL trading immediately |
+| **Daily Loss Limit** | Daily P&L <= -$500 | Blocks new trades for the day |
+| **Drawdown** | Portfolio drops 10% from peak | Blocks all new trades |
+| **Category Limit** | 3+ open trades in same category | Blocks trades in that category |
+| **Consecutive Losses** | 5 losses in a row per strategy | Blocks that strategy |
+
+**API:** `GET /api/circuit-breakers` (status), `POST /api/circuit-breakers` (toggle kill switch, requires CRON_SECRET)
+**CLI:** `npx tsx src/scripts/kill-switch.ts [on|off|status]`
+
+All breaker trips are logged to `strategy_learnings` table with type `circuit_breaker`.
 
 ## Intelligence Layer
 
@@ -225,6 +245,7 @@ src/
       context.ts              # Market data aggregation
       categories.ts           # Category performance tracking
       learnings.ts            # Persistent learning writer
+    stats/wilson.ts           # Wilson score confidence intervals for win rates
     supabase/server.ts        # Supabase service-role client
     supabase/types.ts         # DB row types
   scripts/                    # CLI entry points
@@ -235,8 +256,9 @@ src/
   app/dashboard/
     strategies/page.tsx       # Strategy performance + learnings view
     reviews/page.tsx          # Reviews & learnings history
+    circuit-breakers/page.tsx # Circuit breaker status dashboard
   components/layout/
-    sidebar.tsx               # Navigation (includes Reviews link)
+    sidebar.tsx               # Navigation (includes Reviews + Breakers links)
 supabase/migrations/
   001_initial_schema.sql      # Base tables
   002_strategies.sql          # Strategies + learnings tables

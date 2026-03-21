@@ -20,6 +20,7 @@ import { newListing } from "./new-listing";
 import { liquidityProvision } from "./liquidity-provision";
 import { estimateSlippageYes, estimateSlippageNo } from "./slippage";
 import type { DepthLevel } from "./slippage";
+import { checkCircuitBreakers } from "./circuit-breakers";
 
 const ALL_STRATEGIES: Strategy[] = [
   wideSpread,
@@ -273,6 +274,14 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
     const ev = expectedValue(quantity, entryPrice, opp.fair_value);
     if (ev <= 0) {
       details.push({ ...pick(opp), action: `skipped: negative EV ($${ev.toFixed(2)}) after fees` });
+      skipped++;
+      continue;
+    }
+
+    // --- CIRCUIT BREAKERS: portfolio-level safety checks ---
+    const breakerResult = await checkCircuitBreakers(opp.ticker, opp.strategy_id);
+    if (!breakerResult.allowed) {
+      details.push({ ...pick(opp), action: `halted: ${breakerResult.reason}` });
       skipped++;
       continue;
     }

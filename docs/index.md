@@ -6,3 +6,4 @@
 | [roadmap.md](roadmap.md) | Full roadmap from paper trading through real money — phases, exit criteria, scaling plan |
 | [kalshi-mechanics.md](kalshi-mechanics.md) | Kalshi market mechanics reference (CLOB, fees, order types, settlement, position limits) |
 | [reviews/](reviews/) | Timestamped review reports |
+| [operational-runbook.md](operational-runbook.md) | Circuit breaker response procedures, escalation matrix, monitoring checklists |

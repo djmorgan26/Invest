@@ -11,6 +11,7 @@ import {
   Zap,
   ClipboardCheck,
   DollarSign,
+  ShieldAlert,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ const mainNav = [
   { href: "/dashboard/strategies", label: "Strategies", icon: Zap },
   { href: "/dashboard/pnl", label: "P&L", icon: DollarSign },
   { href: "/dashboard/reviews", label: "Reviews", icon: ClipboardCheck },
+  { href: "/dashboard/circuit-breakers", label: "Breakers", icon: ShieldAlert },
 ];
 
 const bottomNav = [

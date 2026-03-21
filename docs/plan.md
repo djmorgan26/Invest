@@ -80,24 +80,26 @@ Phase 3 (Self-Optimizing Intelligence Layer) complete. Phase 2.5 (Kalshi-aware t
 - [x] P&L API route (`src/app/api/pnl/daily/route.ts`)
 - [x] Orderbook cron timeout fix (55s max-time)
 
-### Phase 5: Statistical Validation & Strategy Tuning [BACKLOG]
-- [ ] Confidence intervals on win rate per strategy
-- [ ] Per-strategy Sharpe ratio and profit factor
-- [ ] Backtesting framework (historical replay through strategies)
+### Phase 5: Statistical Validation & Strategy Tuning [MOSTLY COMPLETE]
+- [x] Confidence intervals on win rate per strategy (`src/lib/stats/wilson.ts`)
+- [x] Per-strategy Sharpe ratio and profit factor (`src/lib/backtesting/engine.ts`)
+- [x] Backtesting framework — historical replay through strategies (`src/lib/backtesting/`)
 - [ ] Walk-forward validation
 - [ ] Maker order paper trading simulation
 - [ ] Maker vs taker comparison analysis
 
-### Phase 6: Pre-Live Hardening [BACKLOG]
+### Phase 6: Pre-Live Hardening [IN PROGRESS]
 - [ ] Kalshi production API order placement module
-- [ ] Daily loss limit circuit breaker
-- [ ] Correlation limit (max 3 per category)
-- [ ] Drawdown circuit breaker (10% from peak → halt)
-- [ ] Manual kill switch (dashboard + CLI)
+- [x] Daily loss limit circuit breaker (`src/lib/strategies/circuit-breakers.ts`)
+- [x] Correlation limit — max 3 open trades per category (`src/lib/strategies/circuit-breakers.ts`)
+- [x] Drawdown circuit breaker — 10% from peak → halt (`src/lib/strategies/circuit-breakers.ts`)
+- [x] Manual kill switch — dashboard API + CLI (`src/scripts/kill-switch.ts`, `/api/circuit-breakers`)
+- [x] Consecutive loss breaker — 5 losses in a row auto-halts strategy (`src/lib/strategies/circuit-breakers.ts`)
 - [ ] Position reconciliation (DB vs Kalshi)
 - [ ] Alerting (trade, error, threshold)
 - [ ] Tax tracking for realized trades
-- [ ] Runbook document
+- [x] Runbook document (`docs/operational-runbook.md`)
+- [x] Circuit breakers dashboard (`src/app/dashboard/circuit-breakers/page.tsx`)
 
 ### Phase 7: Graduated Live Trading [BACKLOG]
 - [ ] Micro scale: $100, 1-3 contracts, 1 strategy, daily review

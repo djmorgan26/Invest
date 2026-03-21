@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { scanAll, autoTrade } from "@/lib/strategies/engine";
+import { getCircuitBreakerStatus } from "@/lib/strategies/circuit-breakers";
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,6 +30,9 @@ export async function GET(request: NextRequest) {
       completed_at: completedAt,
     });
 
+    // Include circuit breaker status in scan response
+    const breakerStatus = await getCircuitBreakerStatus();
+
     return NextResponse.json({
       success: true,
       scan: {
@@ -42,6 +46,12 @@ export async function GET(request: NextRequest) {
         predictions_written: tradeResult.predictions_written,
         skipped: tradeResult.skipped,
         details: tradeResult.details,
+      },
+      circuit_breakers: {
+        all_clear: breakerStatus.all_clear,
+        kill_switch: breakerStatus.kill_switch_active,
+        daily_pnl: breakerStatus.daily_pnl,
+        drawdown_pct: breakerStatus.drawdown_pct,
       },
     });
   } catch (error) {

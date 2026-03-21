@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PnlValue } from "@/components/ui/pnl-value";
 import { GoLiveProgress } from "@/components/pnl/go-live-progress";
 import { PnlTabs } from "@/components/pnl/pnl-tabs";
+import { wilsonScoreInterval } from "@/lib/stats/wilson";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export default async function PnlPage() {
   const totalWins = closedTrades.filter((t) => (t.pnl ?? 0) > 0).length;
   const winRate = totalResolved > 0 ? totalWins / totalResolved : 0;
   const totalPnl = closedTrades.reduce((sum, t) => sum + (t.pnl ?? 0), 0);
+  const winRateCi = wilsonScoreInterval(totalWins, totalResolved);
 
   // Daily P&L
   const dailyMap = new Map<string, { date: string; pnl: number; trades: number; wins: number }>();
@@ -99,9 +101,11 @@ export default async function PnlPage() {
     },
     {
       label: "Win Rate",
-      value: totalResolved > 0 ? formatPercent(winRate) : "N/A",
-      threshold: "> 55%",
-      met: winRate >= 0.55,
+      value: totalResolved > 0
+        ? `${formatPercent(winRate)} [${formatPercent(winRateCi.lower)}\u2013${formatPercent(winRateCi.upper)}]`
+        : "N/A",
+      threshold: "> 55% (CI lower > 50%)",
+      met: winRateCi.lower > 0.50,
     },
     {
       label: "Total P&L",
@@ -180,6 +184,11 @@ export default async function PnlPage() {
             <p className="mt-1 text-2xl font-mono font-semibold">
               {totalResolved > 0 ? formatPercent(winRate) : "N/A"}
             </p>
+            {totalResolved > 0 && (
+              <p className="text-xs text-muted-foreground font-mono">
+                CI: [{formatPercent(winRateCi.lower)}&ndash;{formatPercent(winRateCi.upper)}]
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>

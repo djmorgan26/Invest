@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/ui/status-dot";
 import { PnlValue } from "@/components/ui/pnl-value";
 import { EmptyState } from "@/components/ui/empty-state";
+import { wilsonScoreInterval } from "@/lib/stats/wilson";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,8 @@ export default async function StrategiesPage() {
     const wins = closed.filter((t) => (t.pnl ?? 0) > 0).length;
     const totalPnl = closed.reduce((sum, t) => sum + (t.pnl ?? 0), 0);
 
+    const ci = wilsonScoreInterval(wins, closed.length);
+
     return {
       ...s,
       open_count: open.length,
@@ -36,6 +39,7 @@ export default async function StrategiesPage() {
       wins,
       losses: closed.length - wins,
       win_rate: closed.length > 0 ? wins / closed.length : null,
+      win_rate_ci: closed.length > 0 ? ci : null,
       total_pnl: totalPnl,
       avg_pnl: closed.length > 0 ? totalPnl / closed.length : 0,
       last_trade: closed.length > 0 ? closed[0].closed_at : null,
@@ -100,6 +104,11 @@ export default async function StrategiesPage() {
                         <span className="text-muted-foreground">&mdash;</span>
                       )}
                     </p>
+                    {s.win_rate_ci && (
+                      <p className="text-[10px] text-muted-foreground font-mono">
+                        [{formatPercent(s.win_rate_ci.lower)}&ndash;{formatPercent(s.win_rate_ci.upper)}]
+                      </p>
+                    )}
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">W / L</p>
