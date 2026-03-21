@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { getMarketRaw } from "@/lib/kalshi/client";
+import { dollarsToCents, fpToInt } from "@/lib/kalshi/types";
 
 export async function GET(request: NextRequest) {
   try {
@@ -28,30 +30,52 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Get unique tickers and check settlement status
+    // Fetch fresh market data from Kalshi API for each open trade ticker
     const tickers = [...new Set(openTrades.map((t) => t.ticker))];
-    const { data: settledMarkets, error: marketsError } = await supabase
-      .from("markets")
-      .select("ticker, result, status")
-      .in("ticker", tickers)
-      .not("result", "is", null);
+    const resultMap = new Map<string, string>();
 
-    if (marketsError) {
-      throw new Error(`Failed to fetch market results: ${marketsError.message}`);
+    for (const ticker of tickers) {
+      try {
+        const market = await getMarketRaw(ticker);
+        // Update DB with fresh data (result, volume, status)
+        await supabase
+          .from("markets")
+          .update({
+            result: market.result || null,
+            status: market.status,
+            volume: fpToInt(market.volume_fp),
+            volume_24h: fpToInt(market.volume_24h_fp),
+            yes_bid: dollarsToCents(market.yes_bid_dollars),
+            yes_ask: dollarsToCents(market.yes_ask_dollars),
+            last_price: dollarsToCents(market.last_price_dollars),
+          })
+          .eq("ticker", ticker);
+
+        if (market.result && market.result !== "") {
+          resultMap.set(ticker, market.result);
+        } else if (market.status === "closed") {
+          // Demo API doesn't populate results — infer from last price
+          const lastPrice = dollarsToCents(market.last_price_dollars) ?? 50;
+          if (lastPrice >= 90) {
+            resultMap.set(ticker, "yes");
+          } else if (lastPrice <= 10) {
+            resultMap.set(ticker, "no");
+          }
+        }
+        // Rate limit Kalshi API
+        await new Promise((r) => setTimeout(r, 200));
+      } catch {
+        // Skip if API call fails (market may have been delisted)
+      }
     }
 
-    if (!settledMarkets || settledMarkets.length === 0) {
+    if (resultMap.size === 0) {
       return NextResponse.json({
         success: true,
         resolved: 0,
-        message: "No settled markets for open trades",
+        message: `Checked ${tickers.length} tickers via Kalshi API — none settled yet`,
       });
     }
-
-    // Build a map of settled results
-    const resultMap = new Map(
-      settledMarkets.map((m) => [m.ticker, m.result])
-    );
 
     let resolved = 0;
     const errors: string[] = [];

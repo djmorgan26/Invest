@@ -83,11 +83,21 @@ async function kalshiFetch<T>(method: string, endpoint: string, params?: Record<
 interface KalshiTrade {
   ticker: string;
   trade_id: string;
-  count: number;
-  yes_price: number;
-  no_price: number;
+  count?: number;
+  count_fp?: string;
+  yes_price?: number;
+  yes_price_dollars?: string;
+  no_price?: number;
+  no_price_dollars?: string;
   created_time: string;
   taker_side: string;
+}
+
+function normalizeTrade(t: KalshiTrade): { count: number; yes_price: number; no_price: number } {
+  const count = t.count ?? (t.count_fp ? Math.round(parseFloat(t.count_fp)) : 0);
+  const yes_price = t.yes_price ?? (t.yes_price_dollars ? Math.round(parseFloat(t.yes_price_dollars) * 100) : 0);
+  const no_price = t.no_price ?? (t.no_price_dollars ? Math.round(parseFloat(t.no_price_dollars) * 100) : 0);
+  return { count, yes_price, no_price };
 }
 
 interface KalshiTradesResponse {
@@ -103,7 +113,7 @@ async function fetchTradesForTicker(ticker: string): Promise<KalshiTrade[]> {
     const params: Record<string, string> = { ticker, limit: "200" };
     if (cursor) params.cursor = cursor;
 
-    const response = await kalshiFetch<KalshiTradesResponse>("GET", "/trades", params);
+    const response = await kalshiFetch<KalshiTradesResponse>("GET", "/markets/trades", params);
     allTrades.push(...response.trades);
     cursor = response.cursor || undefined;
 
@@ -149,9 +159,10 @@ function buildCandles(
   }
 
   for (const [bucketStart, bucketTrades] of buckets) {
-    const prices = bucketTrades.map((t) => t.yes_price);
-    const totalVolume = bucketTrades.reduce((s, t) => s + t.count, 0);
-    const vwapNum = bucketTrades.reduce((s, t) => s + t.yes_price * t.count, 0);
+    const normalized = bucketTrades.map((t) => normalizeTrade(t));
+    const prices = normalized.map((t) => t.yes_price);
+    const totalVolume = normalized.reduce((s, t) => s + t.count, 0);
+    const vwapNum = normalized.reduce((s, t) => s + t.yes_price * t.count, 0);
     const vwap = totalVolume > 0 ? Math.round(vwapNum / totalVolume) : prices[0];
 
     candles.push({
@@ -178,22 +189,70 @@ async function main() {
 
   console.log(`Fetching historical trades for settled markets (max=${maxMarkets}, minVol=${minVolume})`);
 
-  // Find settled markets that don't have trades yet
-  const { data: settledMarkets, error: settledErr } = await supabase
+  // Find settled markets — first try DB, then fetch from Kalshi API if needed
+  // The DB may have stale result/volume data, so also fetch recently closed markets
+  let { data: settledMarkets, error: settledErr } = await supabase
     .from("markets")
     .select("ticker, event_ticker, title, volume, close_time, result")
     .not("result", "is", null)
-    .gte("volume", minVolume)
-    .order("volume", { ascending: false })
-    .limit(maxMarkets * 3); // fetch more to filter out already-fetched
+    .neq("result", "")
+    .order("close_time", { ascending: false })
+    .limit(maxMarkets * 3);
 
   if (settledErr) {
     console.error("Failed to query settled markets:", settledErr.message);
     process.exit(1);
   }
 
+  // Also find markets that should have settled (close_time in past) but result is missing
+  if (!settledMarkets || settledMarkets.length < maxMarkets) {
+    console.log("Checking for recently closed markets missing results...");
+    const { data: closedMarkets } = await supabase
+      .from("markets")
+      .select("ticker")
+      .lt("close_time", new Date().toISOString())
+      .or("result.is.null,result.eq.")
+      .order("close_time", { ascending: false })
+      .limit(maxMarkets);
+
+    if (closedMarkets && closedMarkets.length > 0) {
+      console.log(`Found ${closedMarkets.length} closed markets to refresh from Kalshi API`);
+      let refreshed = 0;
+      for (const cm of closedMarkets.slice(0, 100)) {
+        try {
+          const response = await kalshiFetch<{ market: { ticker: string; result: string; volume_fp: string; volume_24h_fp: string; status: string } }>(
+            "GET", `/markets/${cm.ticker}`
+          );
+          const m = response.market;
+          if (m.result && m.result !== "") {
+            await supabase.from("markets").update({
+              result: m.result,
+              status: m.status,
+              volume: m.volume_fp ? Math.round(parseFloat(m.volume_fp)) : null,
+            }).eq("ticker", cm.ticker);
+            refreshed++;
+          }
+          await new Promise((r) => setTimeout(r, 200));
+        } catch {
+          // skip failures
+        }
+      }
+      console.log(`Refreshed ${refreshed} markets with settlement data`);
+
+      // Re-query with updated data
+      const { data: updated } = await supabase
+        .from("markets")
+        .select("ticker, event_ticker, title, volume, close_time, result")
+        .not("result", "is", null)
+        .neq("result", "")
+        .order("close_time", { ascending: false })
+        .limit(maxMarkets * 3);
+      settledMarkets = updated;
+    }
+  }
+
   if (!settledMarkets || settledMarkets.length === 0) {
-    console.log("No settled markets found with sufficient volume.");
+    console.log("No settled markets found. Markets may not have closed yet.");
     return;
   }
 
@@ -227,15 +286,18 @@ async function main() {
 
       // Store trades in batches of 500
       for (let j = 0; j < trades.length; j += 500) {
-        const batch = trades.slice(j, j + 500).map((t) => ({
-          ticker: t.ticker,
-          trade_id: t.trade_id,
-          count: t.count,
-          yes_price: Math.round(t.yes_price * 100), // convert to cents
-          no_price: Math.round(t.no_price * 100),
-          taker_side: t.taker_side,
-          created_time: t.created_time,
-        }));
+        const batch = trades.slice(j, j + 500).map((t) => {
+          const norm = normalizeTrade(t);
+          return {
+            ticker: t.ticker,
+            trade_id: t.trade_id,
+            count: norm.count,
+            yes_price: norm.yes_price, // already in cents from normalizeTrade
+            no_price: norm.no_price,
+            taker_side: t.taker_side,
+            created_time: t.created_time,
+          };
+        });
 
         const { error: insertErr } = await supabase
           .from("market_trades")

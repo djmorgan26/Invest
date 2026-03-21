@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAllActiveMarkets, getEvent } from "@/lib/kalshi/client";
+import { getAllActiveMarkets, getSettledMarkets, getEvent } from "@/lib/kalshi/client";
 import { createServerClient } from "@/lib/supabase/server";
 import { dollarsToCents, fpToInt } from "@/lib/kalshi/types";
 
@@ -68,6 +68,34 @@ export async function GET(request: NextRequest) {
       if (error) throw new Error(`Market upsert failed: ${error.message}`);
     }
 
+    // --- Also sync recently settled markets to get results + volume ---
+    let settledCount = 0;
+    try {
+      const settledMarkets = await getSettledMarkets(500);
+      for (let i = 0; i < settledMarkets.length; i += BATCH_SIZE) {
+        const batch = settledMarkets.slice(i, i + BATCH_SIZE).map((m) => ({
+          ticker: m.ticker,
+          event_ticker: m.event_ticker,
+          title: m.title,
+          subtitle: m.subtitle,
+          status: m.status,
+          yes_bid: dollarsToCents(m.yes_bid_dollars),
+          yes_ask: dollarsToCents(m.yes_ask_dollars),
+          last_price: dollarsToCents(m.last_price_dollars),
+          volume: fpToInt(m.volume_fp),
+          open_interest: fpToInt(m.open_interest_fp),
+          close_time: m.close_time,
+          result: m.result || null,
+          volume_24h: fpToInt(m.volume_24h_fp),
+          liquidity: m.liquidity_dollars ? parseFloat(m.liquidity_dollars) : null,
+        }));
+        await supabase.from("markets").upsert(batch, { onConflict: "ticker" });
+      }
+      settledCount = settledMarkets.length;
+    } catch {
+      // Non-fatal — settled sync is supplementary
+    }
+
     // --- Event enrichment: fetch mutually_exclusive + category for bare stubs ---
     // Find events missing category (bare stubs from initial sync)
     const { data: bareEvents } = await supabase
@@ -117,6 +145,7 @@ export async function GET(request: NextRequest) {
       events_synced: eventRows.length,
       events_enriched: eventsEnriched,
       markets_synced: markets.length,
+      settled_synced: settledCount,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

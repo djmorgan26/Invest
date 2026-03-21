@@ -59,7 +59,22 @@ async function main() {
       }
 
       // Check if market has settled
-      if (!market.result || market.result === "") {
+      let result = market.result;
+      if ((!result || result === "") && market.status === "closed") {
+        // Demo API doesn't populate results — infer from last price
+        // last_price is in cents (0-100). Near 0 = no won, near 100 = yes won
+        const lastPrice = market.last_price; // cents
+        if (lastPrice >= 90) {
+          result = "yes";
+        } else if (lastPrice <= 10) {
+          result = "no";
+        } else {
+          // Price too uncertain to infer result — skip
+          skipped.push(`${ticker} (closed, price=${lastPrice}¢, ambiguous)`);
+          continue;
+        }
+        console.log(`  Demo inference: ${ticker} → ${result} (last_price=${lastPrice}¢)`);
+      } else if (!result || result === "") {
         skipped.push(ticker);
         continue;
       }
@@ -67,8 +82,8 @@ async function main() {
       for (const trade of trades) {
         // Determine exit price: 1.00 if result matches side, 0.00 if not
         const won =
-          (trade.side === "yes" && market.result === "yes") ||
-          (trade.side === "no" && market.result === "no");
+          (trade.side === "yes" && result === "yes") ||
+          (trade.side === "no" && result === "no");
         const exitPrice = won ? 1.0 : 0.0;
         const pnl = (exitPrice - trade.price) * trade.quantity;
 
@@ -95,7 +110,7 @@ async function main() {
           exit_price: exitPrice,
           quantity: trade.quantity,
           pnl: Math.round(pnl * 100) / 100,
-          result: market.result,
+          result,
         });
       }
     }

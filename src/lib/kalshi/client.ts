@@ -50,7 +50,7 @@ export function normalizeMarket(m: KalshiMarket): NormalizedMarket {
 }
 
 const DEMO_BASE = "https://demo-api.kalshi.co/trade-api/v2";
-const PROD_BASE = "https://trading-api.kalshi.com/trade-api/v2";
+const PROD_BASE = "https://api.elections.kalshi.com/trade-api/v2";
 
 interface KalshiClientConfig {
   keyId: string;
@@ -173,6 +173,23 @@ export async function getAllActiveMarkets(): Promise<KalshiMarket[]> {
   return all;
 }
 
+export async function getSettledMarkets(limit: number = 500): Promise<KalshiMarket[]> {
+  const all: KalshiMarket[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const response = await getMarkets({
+      limit: 200,
+      status: "settled",
+      cursor,
+    });
+    all.push(...response.markets);
+    cursor = response.cursor || undefined;
+  } while (cursor || all.length >= limit);
+
+  return all.slice(0, limit);
+}
+
 export async function getEvent(eventTicker: string): Promise<KalshiEventResponse> {
   return kalshiFetch<KalshiEventResponse>("GET", `/events/${eventTicker}`);
 }
@@ -185,7 +202,7 @@ export async function getTrades(
   if (params.limit) queryParams.limit = params.limit.toString();
   if (params.cursor) queryParams.cursor = params.cursor;
 
-  return kalshiFetch<KalshiTradesResponse>("GET", "/trades", queryParams);
+  return kalshiFetch<KalshiTradesResponse>("GET", "/markets/trades", queryParams);
 }
 
 export async function getMarketRaw(ticker: string): Promise<KalshiMarket> {

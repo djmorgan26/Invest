@@ -34,11 +34,23 @@ export interface KalshiEvent {
 export interface KalshiTrade {
   ticker: string;
   trade_id: string;
-  count: number;
-  yes_price: number;
-  no_price: number;
+  // New API uses _fp and _dollars fields
+  count?: number;
+  count_fp?: string;
+  yes_price?: number;
+  yes_price_dollars?: string;
+  no_price?: number;
+  no_price_dollars?: string;
   created_time: string;
   taker_side: string;
+}
+
+// Normalize trade fields (handles both old cent-based and new dollar-based formats)
+export function normalizeTrade(t: KalshiTrade): { count: number; yes_price: number; no_price: number } {
+  const count = t.count ?? (t.count_fp ? Math.round(parseFloat(t.count_fp)) : 0);
+  const yes_price = t.yes_price ?? (t.yes_price_dollars ? Math.round(parseFloat(t.yes_price_dollars) * 100) : 0);
+  const no_price = t.no_price ?? (t.no_price_dollars ? Math.round(parseFloat(t.no_price_dollars) * 100) : 0);
+  return { count, yes_price, no_price };
 }
 
 export interface KalshiMarketsResponse {
