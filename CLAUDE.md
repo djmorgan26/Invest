@@ -48,8 +48,11 @@ Use these for structured analysis sessions:
 | `/project:new-strategy` | Design and implement a new strategy | When patterns suggest a new approach |
 | `/project:market-scan` | Manual intelligent scan for opportunities | When looking beyond what automation finds |
 | `/project:health-check` | System operational verification | When something seems off, or weekly check |
+| `/project:optimize` | **Autonomous strategy optimizer** | When you want AI to backtest, sweep, calibrate, and improve everything |
 
 **Skill: `kalshi-advisor`** — The primary check-in tool. Auto-triggers when working with strategy files, plan docs, or review files. Runs a full strategic advisor session: health check, performance review, market scan, strategic decisions, and persists learnings. Use this every 2-3 days during data collection phase.
+
+**Skill: `strategy-optimizer`** — The autonomous optimization engine. This is the AI brain that decides what to do: fetch historical data, backtest strategies against real settled markets, run parameter sweeps, measure prediction calibration, and push the system toward go-live readiness. Invoke with `/project:optimize` or it auto-triggers on backtest/optimization discussions.
 
 ## Autonomous Operation
 
