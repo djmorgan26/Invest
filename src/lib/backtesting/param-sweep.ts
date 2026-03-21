@@ -112,7 +112,8 @@ export async function runParamSweep(
     category: string | null;
   }>,
   grid: ParamGrid,
-  supabase: ReturnType<typeof import("@supabase/supabase-js").createClient>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
   budget: number = 10000,
   onProgress?: (completed: number, total: number, current: StrategyConfig) => void
 ): Promise<SweepResult[]> {
@@ -198,7 +199,7 @@ function createConfiguredStrategy(
                 return target.from(table);
               };
             }
-            return (target as Record<string, unknown>)[prop as string];
+            return (target as unknown as Record<string, unknown>)[prop as string];
           },
         }),
       };

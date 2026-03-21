@@ -112,7 +112,8 @@ export async function runHistoricalBacktest(
     category: string | null;
   }>,
   config: Partial<BacktestConfig> & { strategies: Strategy[] },
-  supabase: ReturnType<typeof import("@supabase/supabase-js").createClient>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
 ): Promise<{ stats: BacktestStats; trades: SimulatedTrade[] }> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
   const allSimTrades: SimulatedTrade[] = [];
@@ -397,7 +398,7 @@ function createMockScanContext(
           return target.from(table);
         };
       }
-      return (target as Record<string, unknown>)[prop as string];
+      return (target as unknown as Record<string, unknown>)[prop as string];
     },
   };
 

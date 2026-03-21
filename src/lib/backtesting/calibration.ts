@@ -176,7 +176,8 @@ export function formatCalibrationReport(reports: CalibrationReport[]): string {
  */
 export async function storeCalibration(
   reports: CalibrationReport[],
-  supabase: ReturnType<typeof import("@supabase/supabase-js").createClient>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
 ): Promise<void> {
   for (const report of reports) {
     for (const bucket of report.buckets) {
