@@ -73,9 +73,13 @@ export const wideSpread: Strategy = {
       const rr = riskRewardRatio(entryPrice);
       if (rr < config.min_risk_reward) continue;
 
-      // Edge = half spread (we capture the spread by buying at midpoint theory)
-      // But realistically we pay the ask, so edge = fairValue - entryPrice
-      const fairValue = side === "yes" ? midpoint : 1 - midpoint;
+      // Wide-spread edge: we buy at the ask but expect convergence toward the midpoint.
+      // A reasonable fair value estimate is midpoint + a fraction of the half-spread
+      // (we won't capture the full spread, but we expect some mean reversion).
+      const halfSpread = spreadNorm / 2;
+      const fairValue = side === "yes"
+        ? midpoint + halfSpread * 0.35
+        : (1 - midpoint) + halfSpread * 0.35;
       const edge = fairValue - entryPrice;
 
       // Edge must clear Kalshi fees

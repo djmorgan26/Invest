@@ -67,34 +67,48 @@ export const volumeSpike: Strategy = {
 
     if (allSnapshots.length === 0) return opportunities;
 
-    // Build per-ticker baseline: average volume per snapshot in the lookback window
-    // and earliest price for price move calculation
-    const tickerData = new Map<string, { volumes: number[]; earliestPrice: number; recentVolumes: number[] }>();
+    // Build per-ticker data: compute volume DELTAS between consecutive snapshots
+    // (since snapshot volume is cumulative, we need differences to get per-period volume)
+    const tickerData = new Map<string, { baselineDeltas: number[]; recentDeltas: number[]; earliestPrice: number }>();
 
+    // Group snapshots by ticker (already sorted by snapshot_at ascending)
+    const snapshotsByTicker = new Map<string, typeof allSnapshots>();
     for (const snap of allSnapshots) {
-      if (!tickerData.has(snap.ticker)) {
-        tickerData.set(snap.ticker, { volumes: [], earliestPrice: snap.last_price, recentVolumes: [] });
+      if (!snapshotsByTicker.has(snap.ticker)) snapshotsByTicker.set(snap.ticker, []);
+      snapshotsByTicker.get(snap.ticker)!.push(snap);
+    }
+
+    for (const [ticker, snaps] of snapshotsByTicker) {
+      if (snaps.length < 3) continue; // need enough data points for deltas
+      const baselineDeltas: number[] = [];
+      const recentDeltas: number[] = [];
+      for (let i = 1; i < snaps.length; i++) {
+        const delta = Math.max(0, snaps[i].volume - snaps[i - 1].volume);
+        if (new Date(snaps[i].snapshot_at) >= recentCutoff) {
+          recentDeltas.push(delta);
+        } else {
+          baselineDeltas.push(delta);
+        }
       }
-      const data = tickerData.get(snap.ticker)!;
-      data.volumes.push(snap.volume);
-      if (new Date(snap.snapshot_at) >= recentCutoff) {
-        data.recentVolumes.push(snap.volume);
-      }
+      tickerData.set(ticker, { baselineDeltas, recentDeltas, earliestPrice: snaps[0].last_price });
     }
 
     for (const m of openMarkets) {
       const data = tickerData.get(m.ticker);
-      if (!data || data.volumes.length < 2) continue; // need baseline data
+      if (!data || data.baselineDeltas.length < 2) continue; // need baseline data
 
-      // Calculate baseline average volume
-      const baselineAvg = data.volumes.reduce((a, b) => a + b, 0) / data.volumes.length;
+      // Average volume per period in the baseline window
+      const baselineAvg = data.baselineDeltas.reduce((a, b) => a + b, 0) / data.baselineDeltas.length;
       if (baselineAvg <= 0) continue;
 
-      // Current volume (use 24h volume or total volume as proxy)
-      const currentVolume = m.volume_24h ?? m.volume ?? 0;
+      // Average volume per period in the recent window (last 4h)
+      const recentAvg = data.recentDeltas.length > 0
+        ? data.recentDeltas.reduce((a, b) => a + b, 0) / data.recentDeltas.length
+        : 0;
+      if (recentAvg <= 0) continue;
 
-      // Check for spike: current volume vs baseline
-      const volumeRatio = currentVolume / baselineAvg;
+      // Check for spike: recent volume rate vs baseline volume rate
+      const volumeRatio = recentAvg / baselineAvg;
       if (volumeRatio < config.volume_multiplier) continue;
 
       // Check for accompanying price move
@@ -149,7 +163,7 @@ export const volumeSpike: Strategy = {
         confidence: Math.min(0.5 + edge * 0.5, 0.75),
         fair_value: Math.round(fairValue * 10000) / 10000,
         edge: Math.round(edge * 10000) / 10000,
-        reasoning: `Volume spike: ${volumeRatio.toFixed(1)}x baseline (${currentVolume} vs avg ${baselineAvg.toFixed(0)}). Price ${priceMove > 0 ? "+" : ""}${(priceMove * 100).toFixed(1)}¢ over ${config.lookback_hours}h. Entry=${(entryPrice * 100).toFixed(0)}¢ ${side.toUpperCase()}. R/R=${riskRewardRatio(entryPrice).toFixed(2)}.`,
+        reasoning: `Volume spike: ${volumeRatio.toFixed(1)}x baseline (${recentAvg.toFixed(0)}/period vs avg ${baselineAvg.toFixed(0)}/period). Price ${priceMove > 0 ? "+" : ""}${(priceMove * 100).toFixed(1)}¢ over ${config.lookback_hours}h. Entry=${(entryPrice * 100).toFixed(0)}¢ ${side.toUpperCase()}. R/R=${riskRewardRatio(entryPrice).toFixed(2)}.`,
         quantity: 10, // engine will resize
       });
     }

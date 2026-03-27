@@ -53,13 +53,30 @@ export async function GET(request: NextRequest) {
 
         if (market.result && market.result !== "") {
           resultMap.set(ticker, market.result);
-        } else if (market.status === "closed") {
-          // Demo API doesn't populate results — infer from last price
+        } else if (
+          market.status === "closed" ||
+          market.status === "finalized" ||
+          market.status === "settled"
+        ) {
+          // Market settled but result field empty — infer from last price
           const lastPrice = dollarsToCents(market.last_price_dollars) ?? 50;
           if (lastPrice >= 90) {
             resultMap.set(ticker, "yes");
           } else if (lastPrice <= 10) {
             resultMap.set(ticker, "no");
+          }
+        } else if (market.close_time) {
+          // Fallback: market still "active" but close_time has passed by >24h
+          const closeTime = new Date(market.close_time).getTime();
+          const now = Date.now();
+          const hoursSinceClose = (now - closeTime) / (1000 * 60 * 60);
+          if (hoursSinceClose > 24) {
+            const lastPrice = dollarsToCents(market.last_price_dollars) ?? 50;
+            if (lastPrice >= 90) {
+              resultMap.set(ticker, "yes");
+            } else if (lastPrice <= 10) {
+              resultMap.set(ticker, "no");
+            }
           }
         }
         // Rate limit Kalshi API
