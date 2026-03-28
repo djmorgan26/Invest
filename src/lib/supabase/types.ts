@@ -143,5 +143,31 @@ export interface OrderbookSnapshot {
   snapshot_at: string;
 }
 
+export interface ExternalSignalRow {
+  id: string;
+  source: string;
+  signal_type: string;
+  external_id: string | null;
+  ticker: string | null;
+  category: string;
+  title: string;
+  data: Record<string, unknown>;
+  implied_probability: number | null;
+  fetched_at: string;
+  expires_at: string | null;
+  created_at: string;
+}
+
+export interface ExternalMarketMappingRow {
+  id: string;
+  kalshi_ticker: string;
+  source: string;
+  external_id: string;
+  external_title: string | null;
+  match_confidence: number;
+  created_at: string;
+  updated_at: string;
+}
+
 // Remove the Database generic — use untyped supabase client
 // This avoids complex type gymnastics while keeping row types for components

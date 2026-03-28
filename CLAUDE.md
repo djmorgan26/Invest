@@ -39,6 +39,9 @@ AI-powered prediction market analysis tool. Syncs Kalshi markets, tracks prices,
 | **Kill switch ON** | `npx tsx src/scripts/kill-switch.ts on "reason"` |
 | **Kill switch OFF** | `npx tsx src/scripts/kill-switch.ts off` |
 | **Circuit breaker status** | `npx tsx src/scripts/kill-switch.ts status` |
+| **Fetch external data** | `npx tsx src/scripts/fetch-external-data.ts` |
+| **Fetch free data only** | `npx tsx src/scripts/fetch-external-data.ts --free-only` |
+| **Check divergences** | `npx tsx src/scripts/fetch-external-data.ts --divergences` |
 
 ## Claude Code Slash Commands
 
@@ -71,6 +74,42 @@ The system runs autonomously via GitHub Actions cron jobs (`.github/workflows/cr
 | **Strategy tuning** | Weekly (Sun) | Auto-adjust strategy parameters based on results |
 | **Orderbook snapshot** | Every 5 min | Capture order book depth for watchlisted tickers |
 | **Trade history fetch** | Daily (2am) | Fetch trade history for settled markets for backtesting |
+| **External data fetch** | Every 15 min | Fetch signals from Polymarket, ESPN, CoinGecko, weather, economics APIs |
+
+## External Data Sources
+
+Eight connectors pull signals from external APIs to enrich strategy decisions:
+
+| Source | Auth | Data | Category |
+|--------|------|------|----------|
+| **Polymarket** | None | Prediction market prices, volumes, liquidity | politics, crypto, other |
+| **PredictIt** | None | Political contract prices | politics |
+| **ESPN** | None | Live scores, odds for NFL/NBA/MLB/NHL/MLS | sports |
+| **The Odds API** | API key | Consensus odds from 40+ sportsbooks | sports |
+| **FRED** | API key | 15 key economic series (CPI, GDP, unemployment, rates) | economics |
+| **CoinGecko** | None | Top 10 crypto prices, 24h change, Fear & Greed Index | crypto |
+| **Open-Meteo** | None | 7-day forecasts for 10 major US cities | weather |
+| **NWS** | None | Official US weather forecasts (settlement source) | weather |
+
+### Key Files
+- `src/lib/external-data/types.ts` — Shared types for all connectors
+- `src/lib/external-data/index.ts` — Barrel exports, ALL_CONNECTORS / FREE_CONNECTORS
+- `src/lib/external-data/aggregator.ts` — Fetch, store, query, cross-market divergence detection
+- `src/lib/external-data/prediction/` — Polymarket, PredictIt connectors
+- `src/lib/external-data/sports/` — ESPN, The Odds API connectors
+- `src/lib/external-data/economics/fred.ts` — FRED connector (15 series)
+- `src/lib/external-data/crypto/coingecko.ts` — CoinGecko + Fear & Greed Index
+- `src/lib/external-data/weather/` — Open-Meteo, NWS connectors
+- `src/scripts/fetch-external-data.ts` — CLI runner
+- `src/app/api/external-data/fetch/route.ts` — Cron API route
+
+### Environment Variables (optional — free connectors work without these)
+- `ODDS_API_KEY` — From https://the-odds-api.com/ (500 req/month free)
+- `FRED_API_KEY` — From https://fred.stlouisfed.org/docs/api/api_key.html (free, 120 req/min)
+
+### DB Tables
+- `external_signals` — Stored signals with source, type, category, implied probability
+- `external_market_mappings` — Links Kalshi tickers to external market IDs for cross-market comparison
 
 ## Strategies
 
@@ -242,9 +281,18 @@ src/
       calibration.ts          # Prediction accuracy analysis
       index.ts                # Module exports
     intelligence/             # Self-optimizing intelligence layer
-      context.ts              # Market data aggregation
+      context.ts              # Market data aggregation (enriched with external signals)
       categories.ts           # Category performance tracking
       learnings.ts            # Persistent learning writer
+    external-data/            # External API connectors
+      types.ts                # Shared types for all connectors
+      index.ts                # Barrel exports, connector registry
+      aggregator.ts           # Fetch, store, query, cross-market divergence
+      prediction/             # Polymarket, PredictIt
+      sports/                 # ESPN, The Odds API
+      economics/              # FRED
+      crypto/                 # CoinGecko + Fear & Greed
+      weather/                # Open-Meteo, NWS
     stats/wilson.ts           # Wilson score confidence intervals for win rates
     supabase/server.ts        # Supabase service-role client
     supabase/types.ts         # DB row types
@@ -284,7 +332,7 @@ docs/
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `CRON_SECRET`
 
-## DB Tables (17 total)
+## DB Tables (19 total)
 - `events` — Event catalog
 - `markets` — Market data (43K+ synced)
 - `price_snapshots` — Price history time series
@@ -302,3 +350,5 @@ docs/
 - `market_candles` — OHLCV candles built from trade data
 - `backtest_results` — Stored backtest results with strategy configs
 - `prediction_calibration` — Prediction accuracy metrics per strategy
+- `external_signals` — Signals from external APIs (prediction markets, odds, weather, economics)
+- `external_market_mappings` — Links Kalshi tickers to external market IDs

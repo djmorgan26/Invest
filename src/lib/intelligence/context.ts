@@ -1,5 +1,14 @@
 import { createServerClient } from "@/lib/supabase/server";
 
+export interface ExternalSignalSummary {
+  source: string;
+  signal_type: string;
+  title: string;
+  implied_probability: number | null;
+  data: Record<string, unknown>;
+  fetched_at: string;
+}
+
 export interface MarketContext {
   ticker: string;
   event_ticker: string;
@@ -19,6 +28,8 @@ export interface MarketContext {
   price_history_24h: PricePoint[];
   open_trades: OpenTrade[];
   recent_predictions: RecentPrediction[];
+  // External data signals (prediction markets, odds, weather, economic indicators)
+  external_signals: ExternalSignalSummary[];
 }
 
 interface SiblingMarket {
@@ -101,6 +112,32 @@ export async function getMarketContext(ticker: string): Promise<MarketContext | 
     .order("created_at", { ascending: false })
     .limit(5);
 
+  // Get external signals — by ticker mapping or category match
+  const category = event.category;
+  let externalQuery = supabase
+    .from("external_signals")
+    .select("source, signal_type, title, implied_probability, data, fetched_at")
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+    .order("fetched_at", { ascending: false })
+    .limit(20);
+
+  // Try ticker-specific signals first, fall back to category
+  const { data: tickerSignals } = await supabase
+    .from("external_signals")
+    .select("source, signal_type, title, implied_probability, data, fetched_at")
+    .eq("ticker", ticker)
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+    .order("fetched_at", { ascending: false })
+    .limit(10);
+
+  let categorySignals: typeof tickerSignals = [];
+  if (category) {
+    const { data: catSigs } = await externalQuery.eq("category", category.toLowerCase());
+    categorySignals = catSigs;
+  }
+
+  const allExternalSignals = [...(tickerSignals ?? []), ...(categorySignals ?? [])];
+
   // Compute derived fields
   const daysToClose = market.close_time
     ? (new Date(market.close_time).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
@@ -151,6 +188,14 @@ export async function getMarketContext(ticker: string): Promise<MarketContext | 
       edge: p.edge,
       strategy_id: p.strategy_id,
       created_at: p.created_at,
+    })),
+    external_signals: allExternalSignals.map((s) => ({
+      source: s.source,
+      signal_type: s.signal_type,
+      title: s.title,
+      implied_probability: s.implied_probability,
+      data: s.data as Record<string, unknown>,
+      fetched_at: s.fetched_at,
     })),
   };
 }
