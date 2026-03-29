@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
           ticker: t.ticker,
           trade_id: t.trade_id,
           count: t.count,
-          yes_price: Math.round(t.yes_price * 100),
-          no_price: Math.round(t.no_price * 100),
+          yes_price: Math.round((t.yes_price ?? 0) * 100),
+          no_price: Math.round((t.no_price ?? 0) * 100),
           taker_side: t.taker_side,
           created_time: t.created_time,
         }));
@@ -97,9 +97,9 @@ export async function GET(request: NextRequest) {
         }
 
         for (const [bucketStart, bucketTrades] of buckets) {
-          const prices = bucketTrades.map((t) => Math.round(t.yes_price * 100));
-          const totalVol = bucketTrades.reduce((s, t) => s + t.count, 0);
-          const vwapNum = bucketTrades.reduce((s, t) => s + Math.round(t.yes_price * 100) * t.count, 0);
+          const prices = bucketTrades.map((t) => Math.round((t.yes_price ?? 0) * 100));
+          const totalVol = bucketTrades.reduce((s, t) => s + (t.count ?? 0), 0);
+          const vwapNum = bucketTrades.reduce((s, t) => s + Math.round((t.yes_price ?? 0) * 100) * (t.count ?? 0), 0);
 
           candles.push({
             ticker: market.ticker,

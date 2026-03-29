@@ -211,8 +211,8 @@ export function ArbitrageChart({ signals }: ArbitrageChartProps) {
                   <Tooltip
                     contentStyle={chartTooltipStyle}
                     labelStyle={{ color: chartColors.tooltipLabel }}
-                    formatter={(value: number, _: string, payload: { payload: { sources: string } }) => [
-                      `${value}¢ spread — ${payload.payload.sources}`,
+                    formatter={(value: number, _: string, payload: { payload?: { sources?: string } }) => [
+                      `${value}¢ spread — ${payload.payload?.sources ?? ""}`,
                       "Divergence",
                     ]}
                   />
@@ -303,8 +303,8 @@ export function ArbitrageChart({ signals }: ArbitrageChartProps) {
                 contentStyle={chartTooltipStyle}
                 labelStyle={{ color: chartColors.tooltipLabel }}
                 formatter={(value: unknown, name: string) => {
-                  if (name === "Implied Prob") return [`${value}%`, name];
-                  return [value, name];
+                  if (name === "Implied Prob") return [`${String(value)}%`, name];
+                  return [String(value), name];
                 }}
               />
               <Scatter data={scatterData} fill={chartColors.success}>
