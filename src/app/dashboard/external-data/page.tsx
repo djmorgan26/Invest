@@ -3,6 +3,7 @@ import { SourceStatusGrid } from "@/components/external-data/source-status-grid"
 import { SignalFeed } from "@/components/external-data/signal-feed";
 import { ArbitrageChart } from "@/components/external-data/arbitrage-chart";
 import { CategoryBreakdown } from "@/components/external-data/category-breakdown";
+import { LiveMonitorCard } from "@/components/external-data/live-monitor-card";
 import { EmptyState } from "@/components/ui/empty-state";
 
 export const dynamic = "force-dynamic";
@@ -175,6 +176,11 @@ export default async function ExternalDataPage() {
           </div>
         </section>
       </div>
+
+      {/* Live Speed Edge Monitor */}
+      <section>
+        <LiveMonitorCard />
+      </section>
 
       {/* Setup instructions if no data */}
       {totalSignals === 0 && (
