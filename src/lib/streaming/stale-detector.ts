@@ -20,6 +20,7 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
+import { sendOpportunityAlert } from "@/lib/notifications";
 import type { LiveScore, LiveCryptoPrice, StaleOpportunity } from "./types";
 
 // How long a Kalshi market can go without repricing before we flag it
@@ -115,6 +116,25 @@ export async function checkScoreChange(score: LiveScore): Promise<StaleOpportuni
       detected_at: Date.now(),
       expires_at: Date.now() + 120_000, // 2 min window
     });
+  }
+
+  // Send email alerts for each opportunity
+  for (const opp of opportunities) {
+    sendOpportunityAlert({
+      ticker: opp.ticker,
+      market_title: opp.market_title,
+      category: opp.category,
+      trigger_source: opp.trigger_source,
+      trigger_event: opp.trigger_event,
+      trigger_detail: opp.trigger_detail,
+      kalshi_price: opp.kalshi_price,
+      estimated_fair_value: opp.estimated_fair_value,
+      edge_cents: opp.edge_cents,
+      side: opp.side,
+      confidence: opp.confidence,
+      staleness_seconds: Math.round(opp.staleness_ms / 1000),
+      window_seconds: Math.round((opp.expires_at - Date.now()) / 1000),
+    }).catch(() => {}); // Fire and forget — don't block on email
   }
 
   return opportunities;
@@ -218,6 +238,25 @@ export async function checkCryptoMove(
       detected_at: Date.now(),
       expires_at: Date.now() + 90_000, // 90 sec window for crypto
     });
+  }
+
+  // Send email alerts
+  for (const opp of opportunities) {
+    sendOpportunityAlert({
+      ticker: opp.ticker,
+      market_title: opp.market_title,
+      category: opp.category,
+      trigger_source: opp.trigger_source,
+      trigger_event: opp.trigger_event,
+      trigger_detail: opp.trigger_detail,
+      kalshi_price: opp.kalshi_price,
+      estimated_fair_value: opp.estimated_fair_value,
+      edge_cents: opp.edge_cents,
+      side: opp.side,
+      confidence: opp.confidence,
+      staleness_seconds: Math.round(opp.staleness_ms / 1000),
+      window_seconds: Math.round((opp.expires_at - Date.now()) / 1000),
+    }).catch(() => {});
   }
 
   return opportunities;

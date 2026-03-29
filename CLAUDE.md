@@ -75,6 +75,7 @@ The system runs autonomously via GitHub Actions cron jobs (`.github/workflows/cr
 | **Orderbook snapshot** | Every 5 min | Capture order book depth for watchlisted tickers |
 | **Trade history fetch** | Daily (2am) | Fetch trade history for settled markets for backtesting |
 | **External data fetch** | Every 15 min | Fetch signals from Polymarket, ESPN, CoinGecko, weather, economics APIs |
+| **Alert check** | Every 5 min | Detect stale Kalshi prices vs external data, send email alerts |
 
 ## External Data Sources
 
@@ -106,6 +107,9 @@ Eight connectors pull signals from external APIs to enrich strategy decisions:
 ### Environment Variables (optional — free connectors work without these)
 - `ODDS_API_KEY` — From https://the-odds-api.com/ (500 req/month free)
 - `FRED_API_KEY` — From https://fred.stlouisfed.org/docs/api/api_key.html (free, 120 req/min)
+- `RESEND_API_KEY` — From https://resend.com/ (100 emails/day free)
+- `RESEND_FROM_EMAIL` — Your verified sender domain email (or use `onboarding@resend.dev` for testing)
+- `ALERT_EMAIL` — Email address to receive opportunity alerts
 
 ### DB Tables
 - `external_signals` — Stored signals with source, type, category, implied probability
@@ -331,6 +335,9 @@ docs/
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `CRON_SECRET`
+- `RESEND_API_KEY` (email alerts)
+- `RESEND_FROM_EMAIL` (verified sender)
+- `ALERT_EMAIL` (recipient for opportunity alerts)
 
 ## DB Tables (19 total)
 - `events` — Event catalog

@@ -16,6 +16,8 @@ on:
     - cron: '0 0 * * 0'
     # External data fetch — every 15 minutes
     - cron: '*/15 * * * *'
+    # Alert check — every 5 minutes (stale price detection + email alerts)
+    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
     # Historical trade fetch — daily at 2am
     - cron: '0 2 * * *'
   workflow_dispatch:
@@ -34,6 +36,7 @@ on:
           - orderbook
           - fetch-history
           - external-data
+          - alert-check
           - all
 
 jobs:
@@ -139,6 +142,22 @@ jobs:
           cat /tmp/response.txt
           if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
             echo "::error::HTTP $HTTP_CODE from /api/orderbook/snapshot"
+            exit 1
+          fi
+
+  alert-check:
+    if: github.event.schedule == '2,7,12,17,22,27,32,37,42,47,52,57 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'alert-check' || inputs.job == 'all'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for stale price opportunities + send email alerts
+        run: |
+          HTTP_CODE=$(curl -sS --max-time 25 -o /tmp/response.txt -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/alerts/check")
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::HTTP $HTTP_CODE from /api/alerts/check"
             exit 1
           fi
 
