@@ -169,9 +169,12 @@ export async function getMarkets(
   return kalshiFetch<KalshiMarketsResponse>("GET", "/markets", queryParams);
 }
 
-export async function getAllActiveMarkets(): Promise<KalshiMarket[]> {
+export async function getAllActiveMarkets(
+  maxPages?: number,
+  startCursor?: string
+): Promise<KalshiMarket[] & { nextCursor?: string }> {
   const all: KalshiMarket[] = [];
-  let cursor: string | undefined;
+  let cursor: string | undefined = startCursor;
   let page = 0;
 
   do {
@@ -183,13 +186,17 @@ export async function getAllActiveMarkets(): Promise<KalshiMarket[]> {
     all.push(...response.markets);
     cursor = response.cursor || undefined;
     page++;
-    // Pace requests to stay under rate limits (10 req/s safe margin)
+    // Pace requests to stay under rate limits
     if (cursor && page % 5 === 0) {
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
+    // Stop early if page limit reached (for chunked sync)
+    if (maxPages && page >= maxPages) break;
   } while (cursor);
 
-  return all;
+  const result = all as KalshiMarket[] & { nextCursor?: string };
+  result.nextCursor = cursor;
+  return result;
 }
 
 export async function getSettledMarkets(limit: number = 500): Promise<KalshiMarket[]> {

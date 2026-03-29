@@ -44,16 +44,35 @@ jobs:
     if: github.event.schedule == '0 */6 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'sync' || inputs.job == 'all'))
     runs-on: ubuntu-latest
     steps:
-      - name: Sync markets
+      - name: Sync markets (chunked — resumes via cursor)
         run: |
-          HTTP_CODE=$(curl -sS -o /tmp/response.txt -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/markets/sync")
-          cat /tmp/response.txt
-          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-            echo "::error::HTTP $HTTP_CODE from /api/markets/sync"
-            exit 1
-          fi
+          CURSOR=""
+          CHUNK=1
+          MAX_CHUNKS=12
+          while [ $CHUNK -le $MAX_CHUNKS ]; do
+            echo "=== Chunk $CHUNK ==="
+            URL="${{ secrets.APP_URL }}/api/markets/sync"
+            if [ -n "$CURSOR" ]; then
+              URL="${URL}?cursor=${CURSOR}"
+            fi
+            HTTP_CODE=$(curl -sS --max-time 55 -o /tmp/response.txt -w "%{http_code}" \
+              -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+              "$URL")
+            cat /tmp/response.txt
+            if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+              echo "::error::HTTP $HTTP_CODE from /api/markets/sync (chunk $CHUNK)"
+              exit 1
+            fi
+            # Check if there's a next cursor
+            CURSOR=$(cat /tmp/response.txt | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('next_cursor','') or '')" 2>/dev/null || echo "")
+            if [ -z "$CURSOR" ]; then
+              echo "Sync complete after $CHUNK chunks"
+              break
+            fi
+            echo "Continuing with cursor: $CURSOR"
+            CHUNK=$((CHUNK + 1))
+            sleep 2
+          done
 
   snapshot:
     if: github.event.schedule == '*/5 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'snapshot' || inputs.job == 'all'))
