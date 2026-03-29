@@ -21,19 +21,11 @@ export default async function ExternalDataPage() {
   const perSourceLimit = 15;
 
   const [
-    sourceStatsRes,
     categoryRes,
     mappingsRes,
     totalCountRes,
     ...perSourceResults
   ] = await Promise.all([
-    // All signals for per-source stats (just source + timestamp)
-    supabase
-      .from("external_signals")
-      .select("source, fetched_at")
-      .order("fetched_at", { ascending: false })
-      .limit(5000),
-
     // Active signals by category
     supabase
       .from("external_signals")
@@ -66,18 +58,34 @@ export default async function ExternalDataPage() {
   const recentSignals = perSourceResults
     .flatMap((r) => r.data ?? [])
     .sort((a, b) => new Date(b.fetched_at).getTime() - new Date(a.fetched_at).getTime());
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allSourceData: any[] = sourceStatsRes.data ?? [];
   const totalSignals = totalCountRes.count ?? 0;
   const totalMappings = mappingsRes.count ?? 0;
+  const STALE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour — cron runs every 15min
 
-  // Build per-source stats
+  // Build per-source stats using per-source queries for accurate counts
+  const sourceStatsPromises = EXPECTED_SOURCES.map(async (source) => {
+    const [countRes, latestRes] = await Promise.all([
+      supabase
+        .from("external_signals")
+        .select("*", { count: "exact", head: true })
+        .eq("source", source),
+      supabase
+        .from("external_signals")
+        .select("fetched_at")
+        .eq("source", source)
+        .order("fetched_at", { ascending: false })
+        .limit(1),
+    ]);
+    const count = countRes.count ?? 0;
+    const latest = latestRes.data?.[0]?.fetched_at ?? null;
+    const stale = !latest || (Date.now() - new Date(latest).getTime()) > STALE_THRESHOLD_MS;
+    return { source, count, latest, stale };
+  });
+  const sourceStatsArray = await Promise.all(sourceStatsPromises);
+
   const sourceStats: Record<string, { count: number; latest: string | null; stale: boolean }> = {};
-  for (const source of EXPECTED_SOURCES) {
-    const sourceSignals = allSourceData.filter((s: { source: string }) => s.source === source);
-    const latest = sourceSignals.length > 0 ? sourceSignals[0].fetched_at : null;
-    const stale = !latest || (Date.now() - new Date(latest).getTime()) > 30 * 60 * 1000;
-    sourceStats[source] = { count: sourceSignals.length, latest, stale };
+  for (const s of sourceStatsArray) {
+    sourceStats[s.source] = { count: s.count, latest: s.latest, stale: s.stale };
   }
 
   // Category breakdown
