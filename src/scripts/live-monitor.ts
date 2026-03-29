@@ -1,4 +1,7 @@
 #!/usr/bin/env npx tsx
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
 /**
  * Live Speed Edge Monitor
  *

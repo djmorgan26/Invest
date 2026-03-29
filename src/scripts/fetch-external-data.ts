@@ -1,4 +1,7 @@
 #!/usr/bin/env npx tsx
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
 /**
  * Fetch external data from all configured connectors and store in Supabase.
  *
