@@ -3,6 +3,8 @@ import { getAllActiveMarkets, getSettledMarkets, getEvent } from "@/lib/kalshi/c
 import { createServerClient } from "@/lib/supabase/server";
 import { dollarsToCents, fpToInt } from "@/lib/kalshi/types";
 
+export const maxDuration = 300; // 5 minutes — full market sync paginates 43K+ markets
+
 const BATCH_SIZE = 500;
 const EVENT_ENRICH_LIMIT = 50; // max events to enrich per run
 const EVENT_ENRICH_DELAY_MS = 200; // rate limit between Kalshi API calls
