@@ -11,6 +11,7 @@ import {
   Brain,
   Zap,
   ClipboardCheck,
+  Radio,
   Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ const moreItems = [
   { href: "/dashboard/predictions", label: "Predictions", icon: Brain },
   { href: "/dashboard/strategies", label: "Strategies", icon: Zap },
   { href: "/dashboard/reviews", label: "Reviews", icon: ClipboardCheck },
+  { href: "/dashboard/external-data", label: "Data Sources", icon: Radio },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
