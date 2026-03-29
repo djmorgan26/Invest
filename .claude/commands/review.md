@@ -6,11 +6,43 @@ Analyze:
 3. What market categories/types produce the best trades?
 4. Review recent strategy_learnings — are the tuner's adjustments helping?
 5. Check if any strategy should be disabled, re-parameterized, or fundamentally redesigned.
+6. **External data impact:** Are cross-market divergences (Polymarket, PredictIt, odds APIs) generating better trades?
+7. **Live monitor effectiveness:** Has the stale-detector speed edge system caught real opportunities?
+8. **Alert system:** Review recent email alerts — are they actionable or noise?
+
+Also run these supplementary queries via Supabase MCP `execute_sql` (project: `mewhujreglvsqllupbjl`):
+
+### External signal coverage
+```sql
+SELECT source, signal_type, COUNT(*) as signals, MAX(fetched_at) as latest
+FROM external_signals
+WHERE fetched_at > NOW() - INTERVAL '24 hours'
+GROUP BY source, signal_type
+ORDER BY signals DESC;
+```
+
+### Cross-market divergences found recently
+```sql
+SELECT emm.kalshi_ticker, m.title as kalshi_title, m.last_price as kalshi_price,
+       es.source, es.title as external_title,
+       ROUND((es.implied_probability * 100)::numeric, 1) as external_price,
+       ROUND((es.implied_probability * 100 - m.last_price)::numeric, 1) as divergence_cents
+FROM external_market_mappings emm
+JOIN markets m ON emm.kalshi_ticker = m.ticker
+JOIN external_signals es ON es.source = emm.source
+WHERE m.status IN ('open', 'active')
+  AND es.fetched_at > NOW() - INTERVAL '6 hours'
+  AND ABS(es.implied_probability * 100 - m.last_price) > 5
+ORDER BY ABS(es.implied_probability * 100 - m.last_price) DESC
+LIMIT 15;
+```
 
 Output a structured report with:
 - **Status summary** (1 paragraph)
-- **Per-strategy assessment** (2-3 sentences each)
+- **Per-strategy assessment** (2-3 sentences each, all 10 strategies)
 - **Category performance** (which market categories work best)
+- **External data ROI** (are the 8 connectors adding value? which sources correlate with wins?)
+- **Speed edge assessment** (live monitor + alert system effectiveness)
 - **Top 3 recommended actions** (ranked by expected impact)
 - **Any new strategy ideas** based on patterns you see
 

@@ -21,11 +21,45 @@ Given a market ticker (passed as $ARGUMENTS, or ask if not provided), investigat
    SELECT * FROM predictions WHERE ticker = '<TICKER>' ORDER BY created_at DESC LIMIT 5;
    ```
 
-5. **External context:** Search the web for recent news relevant to this market's title and category.
+5. **Orderbook depth:** Check recent orderbook snapshots:
+   ```sql
+   SELECT * FROM orderbook_snapshots WHERE ticker = '<TICKER>' ORDER BY snapshot_at DESC LIMIT 5;
+   ```
 
-6. **Assessment:** Based on all data:
+6. **External signals:** Check what external data sources say about this market:
+   ```sql
+   -- Direct market mappings
+   SELECT es.source, es.title, es.implied_probability, es.signal_type, es.data, es.fetched_at
+   FROM external_signals es
+   JOIN external_market_mappings emm ON es.source = emm.source
+   WHERE emm.kalshi_ticker = '<TICKER>'
+     AND es.fetched_at > NOW() - INTERVAL '24 hours'
+   ORDER BY es.fetched_at DESC;
+
+   -- Category-level signals (fallback if no direct mapping)
+   SELECT es.source, es.title, es.implied_probability, es.signal_type, es.category, es.fetched_at
+   FROM external_signals es
+   WHERE es.category = (SELECT e.category FROM markets m JOIN events e ON m.event_ticker = e.event_ticker WHERE m.ticker = '<TICKER>')
+     AND es.fetched_at > NOW() - INTERVAL '24 hours'
+   ORDER BY es.fetched_at DESC
+   LIMIT 20;
+   ```
+
+7. **Cross-market price comparison:** If mapped to external markets, compare pricing:
+   ```sql
+   SELECT emm.source, emm.external_id, emm.external_title, emm.match_confidence,
+          m.last_price as kalshi_price
+   FROM external_market_mappings emm
+   JOIN markets m ON emm.kalshi_ticker = m.ticker
+   WHERE emm.kalshi_ticker = '<TICKER>';
+   ```
+
+8. **External context:** Search the web for recent news relevant to this market's title and category.
+
+9. **Assessment:** Based on all data (internal + external):
    - Is this market correctly priced?
-   - Is there an identifiable edge?
+   - Do external sources agree or disagree with Kalshi pricing?
+   - Is there an identifiable edge? How large?
    - What's the risk/reward?
    - If edge exists: recommend trade parameters (side, confidence, fair_value, quantity)
    - If no edge: explain why and what would need to change

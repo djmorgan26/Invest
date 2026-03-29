@@ -12,8 +12,8 @@ FROM sync_log
 GROUP BY type
 ORDER BY last_run DESC;
 ```
-Expected types: `market_sync`, `price_snapshot`, `strategy_scan`, `trade_resolve`, `portfolio_snapshot`.
-Flag DEGRADED if any hasn't run in 2+ hours (except weekly `strategy_tune`).
+Expected types: `market_sync`, `price_snapshot`, `strategy_scan`, `trade_resolve`, `portfolio_snapshot`, `orderbook_snapshot`, `external_data_fetch`, `alert_check`, `trade_history_fetch`.
+Flag DEGRADED if any hasn't run in 2+ hours (except weekly `strategy_tune` and daily `trade_history_fetch`).
 
 ### Data Coverage
 ```sql
@@ -36,6 +36,33 @@ WHERE snapshot_at > NOW() - INTERVAL '24 hours';
 ### Watchlist Size
 ```sql
 SELECT COUNT(*) as watchlist_size FROM watchlist;
+```
+
+### External Data Freshness
+```sql
+SELECT source, COUNT(*) as signals,
+       MAX(fetched_at) as latest_fetch,
+       COUNT(*) FILTER (WHERE fetched_at > NOW() - INTERVAL '1 hour') as signals_last_hour
+FROM external_signals
+GROUP BY source
+ORDER BY latest_fetch DESC;
+```
+Expected sources: `polymarket`, `predictit`, `espn`, `odds_api`, `fred`, `coingecko`, `open_meteo`, `nws`.
+
+### External Market Mapping Coverage
+```sql
+SELECT source, COUNT(*) as mappings, ROUND(AVG(match_confidence)::numeric, 2) as avg_confidence
+FROM external_market_mappings
+GROUP BY source;
+```
+
+### Alert System Status
+```sql
+SELECT type, status, records_processed, error_message, started_at
+FROM sync_log
+WHERE type = 'alert_check'
+ORDER BY started_at DESC
+LIMIT 5;
 ```
 
 ---
@@ -86,6 +113,59 @@ SELECT strategy_id, learning_type, description, created_at
 FROM strategy_learnings
 ORDER BY created_at DESC
 LIMIT 10;
+```
+
+---
+
+## External Data Queries
+
+### Signal Coverage by Source and Category
+```sql
+SELECT source, category, signal_type, COUNT(*) as signals, MAX(fetched_at) as latest
+FROM external_signals
+WHERE fetched_at > NOW() - INTERVAL '24 hours'
+GROUP BY source, category, signal_type
+ORDER BY signals DESC;
+```
+
+### Cross-Market Divergences (Kalshi vs External)
+```sql
+SELECT emm.kalshi_ticker, m.title as kalshi_title, m.last_price as kalshi_price,
+       es.source, es.title as external_title,
+       ROUND((es.implied_probability * 100)::numeric, 1) as external_price,
+       ROUND((es.implied_probability * 100 - m.last_price)::numeric, 1) as divergence_cents,
+       m.close_time, m.volume
+FROM external_market_mappings emm
+JOIN markets m ON emm.kalshi_ticker = m.ticker
+JOIN external_signals es ON es.source = emm.source
+WHERE m.status IN ('open', 'active')
+  AND es.fetched_at > NOW() - INTERVAL '6 hours'
+  AND ABS(es.implied_probability * 100 - m.last_price) > 5
+ORDER BY ABS(es.implied_probability * 100 - m.last_price) DESC
+LIMIT 20;
+```
+
+### External Signals for a Specific Market
+```sql
+-- Replace <TICKER> with actual ticker
+SELECT es.source, es.title, es.implied_probability, es.signal_type, es.data, es.fetched_at
+FROM external_signals es
+JOIN external_market_mappings emm ON es.source = emm.source
+WHERE emm.kalshi_ticker = '<TICKER>'
+  AND es.fetched_at > NOW() - INTERVAL '24 hours'
+ORDER BY es.fetched_at DESC;
+```
+
+### Unmapped Markets with External Opportunities
+```sql
+SELECT m.ticker, m.title, m.volume, m.last_price, e.category
+FROM markets m
+JOIN events e ON m.event_ticker = e.event_ticker
+WHERE m.status IN ('open', 'active')
+  AND m.volume > 200
+  AND NOT EXISTS (SELECT 1 FROM external_market_mappings emm WHERE emm.kalshi_ticker = m.ticker)
+ORDER BY m.volume DESC
+LIMIT 20;
 ```
 
 ---

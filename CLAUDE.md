@@ -19,7 +19,7 @@ The goal is not to have opinions about markets. The goal is to have a system tha
 ## Project Overview
 AI-powered prediction market analysis tool. Syncs Kalshi markets, tracks prices, generates predictions via Claude Code, and paper trades to validate strategy before risking real capital.
 
-**Architecture:** Next.js dashboard + Supabase (DB/Auth) + Kalshi API + Claude Code (AI brain) + Autonomous Strategy Engine + Intelligence Layer
+**Architecture:** Next.js dashboard + Supabase (DB/Auth) + Kalshi API + Claude Code (AI brain) + Autonomous Strategy Engine + Intelligence Layer + External Data Connectors (8 sources) + Live Speed Edge Monitor (WebSocket streaming)
 
 ## Quick Commands
 
@@ -42,6 +42,10 @@ AI-powered prediction market analysis tool. Syncs Kalshi markets, tracks prices,
 | **Fetch external data** | `npx tsx src/scripts/fetch-external-data.ts` |
 | **Fetch free data only** | `npx tsx src/scripts/fetch-external-data.ts --free-only` |
 | **Check divergences** | `npx tsx src/scripts/fetch-external-data.ts --divergences` |
+| **Live monitor** | `npx tsx src/scripts/live-monitor.ts` |
+| **Live monitor (sports)** | `npx tsx src/scripts/live-monitor.ts --sports-only` |
+| **Live monitor (crypto)** | `npx tsx src/scripts/live-monitor.ts --crypto-only` |
+| **Sync settled markets** | `npx tsx src/scripts/sync-settled.ts` |
 
 ## Claude Code Slash Commands
 
@@ -115,6 +119,41 @@ Eight connectors pull signals from external APIs to enrich strategy decisions:
 - `external_signals` — Stored signals with source, type, category, implied probability
 - `external_market_mappings` — Links Kalshi tickers to external market IDs for cross-market comparison
 
+## Live Speed Edge Monitor
+
+Real-time WebSocket streaming to detect stale Kalshi prices after external events happen:
+
+### How It Works
+1. **Binance WebSocket** streams live crypto prices (BTC, ETH, SOL, DOGE)
+2. **ESPN poller** tracks live sports scores (NFL, NBA, MLB, NHL, MLS) with change detection
+3. **Kalshi WebSocket** monitors orderbook and trade updates
+4. **Stale detector** (`src/lib/streaming/stale-detector.ts`) compares: when did the real-world event happen vs. when did Kalshi reprice?
+
+### Key Parameters
+- Staleness threshold: 60 seconds minimum window
+- Minimum edge: 5 cents
+- Sports fair value: league-specific multipliers (NBA: 0.015/point, NFL: 0.07, MLB: 0.08)
+- Crypto fair value: 5-point moves = ~±20 cent shifts on range markets
+- Duplicate cooldown: 2 minutes per ticker
+
+### Key Files
+- `src/lib/streaming/stale-detector.ts` — Core speed edge detection engine
+- `src/lib/streaming/binance-ws.ts` — Binance WebSocket client
+- `src/lib/streaming/espn-poller.ts` — ESPN live score poller
+- `src/lib/streaming/kalshi-ws.ts` — Kalshi WebSocket client
+- `src/lib/streaming/types.ts` — LiveScore, LiveCryptoPrice, StaleOpportunity types
+- `src/scripts/live-monitor.ts` — CLI runner for real-time monitoring
+
+### Alert System
+When stale opportunities are detected, the system sends email alerts via Resend with:
+- Ticker, market title, category
+- Trigger source and event details
+- Kalshi price vs estimated fair value
+- Edge size and recommended side
+- Staleness window duration
+
+The alert system also runs on a 5-minute cron (`/api/alerts/check`) as a fallback when the live monitor isn't running.
+
 ## Strategies
 
 Ten autonomous strategies scan for opportunities:
@@ -176,6 +215,7 @@ Aggregates everything known about a market into one object:
 - 24h price history from snapshots
 - Sibling markets in same event
 - Open trades and recent predictions
+- **External signals** — up to 20 signals from external APIs (ticker-specific first, then category fallback)
 - Derived: days to close, spread size
 
 ### Category Performance (`src/lib/intelligence/categories.ts`)
@@ -266,18 +306,30 @@ src/
     strategies/tune/          # Auto-tune parameters (weekly)
     portfolio/snapshot/       # Portfolio value tracking (hourly)
     orderbook/snapshot/       # Order book depth snapshots
+    external-data/fetch/      # External data fetch (every 15 min)
+    external-data/status/     # External connector status
+    alerts/check/             # Stale price alert detection (every 5 min)
     review/report/            # Review report JSON API
+    circuit-breakers/         # Kill switch control API
   lib/
     kalshi/client.ts          # Authenticated Kalshi API client
     kalshi/types.ts           # Kalshi response types
-    strategies/               # Strategy engine
+    strategies/               # Strategy engine (10 strategies)
       types.ts                # Strategy, Opportunity interfaces
       engine.ts               # Scanner, auto-trader, decay detection
       tuner.ts                # Parameter optimization
+      circuit-breakers.ts     # Portfolio-level safety checks
+      kalshi-math.ts          # Fee calculator, position sizing, EV
       wide-spread.ts          # Wide spread strategy
       stale-price.ts          # Stale price strategy
       extreme-value.ts        # Extreme value strategy
       mean-reversion.ts       # Mean reversion strategy
+      volume-spike.ts         # Volume spike strategy
+      event-cluster.ts        # Event cluster arbitrage
+      favorite-longshot.ts    # Favorite-longshot bias
+      expiry-convergence.ts   # Expiry convergence
+      new-listing.ts          # New listing edge
+      liquidity-provision.ts  # Liquidity provision
     backtesting/              # Historical backtesting engine
       engine.ts               # Core backtest runner
       snapshot-reconstructor.ts # Rebuild market state from trades
@@ -288,15 +340,21 @@ src/
       context.ts              # Market data aggregation (enriched with external signals)
       categories.ts           # Category performance tracking
       learnings.ts            # Persistent learning writer
-    external-data/            # External API connectors
+    external-data/            # External API connectors (8 sources)
       types.ts                # Shared types for all connectors
-      index.ts                # Barrel exports, connector registry
+      index.ts                # Barrel exports, ALL_CONNECTORS / FREE_CONNECTORS
       aggregator.ts           # Fetch, store, query, cross-market divergence
       prediction/             # Polymarket, PredictIt
       sports/                 # ESPN, The Odds API
       economics/              # FRED
       crypto/                 # CoinGecko + Fear & Greed
       weather/                # Open-Meteo, NWS
+    streaming/                # Live WebSocket streaming for speed edge
+      stale-detector.ts       # Core speed edge detection engine
+      binance-ws.ts           # Binance WebSocket for live crypto prices
+      espn-poller.ts          # ESPN live score polling with change detection
+      kalshi-ws.ts            # Kalshi WebSocket for orderbook/trade updates
+      types.ts                # LiveScore, LiveCryptoPrice, StaleOpportunity
     stats/wilson.ts           # Wilson score confidence intervals for win rates
     supabase/server.ts        # Supabase service-role client
     supabase/types.ts         # DB row types
@@ -305,10 +363,15 @@ src/
     review-performance.ts     # Comprehensive report (writes to reviews table)
     fetch-historical-trades.ts # Fetch + store trade history from Kalshi
     backtest-historical.ts    # Run backtests / parameter sweeps
+    fetch-external-data.ts    # External data fetch + divergence detection
+    live-monitor.ts           # Real-time stale price detection (WebSocket)
+    sync-settled.ts           # Sync settled markets from production API
+    kill-switch.ts            # Circuit breaker CLI control
   app/dashboard/
     strategies/page.tsx       # Strategy performance + learnings view
     reviews/page.tsx          # Reviews & learnings history
     circuit-breakers/page.tsx # Circuit breaker status dashboard
+    external-data/page.tsx    # External data signal feed viewer
   components/layout/
     sidebar.tsx               # Navigation (includes Reviews + Breakers links)
 supabase/migrations/
@@ -322,10 +385,14 @@ supabase/migrations/
   new-strategy.md             # /project:new-strategy
   market-scan.md              # /project:market-scan
   health-check.md             # /project:health-check
+  optimize.md                 # /project:optimize
+.claude/skills/               # Claude Code skills
+  kalshi-advisor/             # Strategic advisor skill
+  strategy-optimizer/         # Autonomous optimization skill
 docs/
   plan.md                     # Implementation plan + backlog
   reviews/                    # Timestamped review files
-.github/workflows/crons.yml  # GitHub Actions cron schedules
+.github/workflows/crons.yml  # GitHub Actions cron schedules (10 jobs)
 ```
 
 ## Key Environment Variables

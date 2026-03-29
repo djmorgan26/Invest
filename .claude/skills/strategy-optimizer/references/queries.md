@@ -186,6 +186,55 @@ ORDER BY created_at DESC;
 
 ---
 
+## External Data
+
+### Signal Coverage
+```sql
+SELECT source, category, signal_type, COUNT(*) as signals, MAX(fetched_at) as latest
+FROM external_signals
+WHERE fetched_at > NOW() - INTERVAL '24 hours'
+GROUP BY source, category, signal_type
+ORDER BY signals DESC;
+```
+
+### Cross-Market Divergences
+```sql
+SELECT emm.kalshi_ticker, m.title as kalshi_title, m.last_price as kalshi_price,
+       es.source, es.title as external_title,
+       ROUND((es.implied_probability * 100)::numeric, 1) as external_price,
+       ROUND((es.implied_probability * 100 - m.last_price)::numeric, 1) as divergence_cents,
+       m.close_time, m.volume
+FROM external_market_mappings emm
+JOIN markets m ON emm.kalshi_ticker = m.ticker
+JOIN external_signals es ON es.source = emm.source
+WHERE m.status IN ('open', 'active')
+  AND es.fetched_at > NOW() - INTERVAL '6 hours'
+  AND ABS(es.implied_probability * 100 - m.last_price) > 5
+ORDER BY ABS(es.implied_probability * 100 - m.last_price) DESC
+LIMIT 20;
+```
+
+### Mapping Coverage
+```sql
+SELECT source, COUNT(*) as mappings, ROUND(AVG(match_confidence)::numeric, 2) as avg_confidence
+FROM external_market_mappings
+GROUP BY source;
+```
+
+### High-Volume Unmapped Markets
+```sql
+SELECT m.ticker, m.title, m.volume, m.last_price, e.category
+FROM markets m
+JOIN events e ON m.event_ticker = e.event_ticker
+WHERE m.status IN ('open', 'active')
+  AND m.volume > 200
+  AND NOT EXISTS (SELECT 1 FROM external_market_mappings emm WHERE emm.kalshi_ticker = m.ticker)
+ORDER BY m.volume DESC
+LIMIT 20;
+```
+
+---
+
 ## Market Data
 
 ### Settled Market Stats

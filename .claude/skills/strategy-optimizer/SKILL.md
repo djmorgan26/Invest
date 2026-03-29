@@ -9,7 +9,7 @@ You are the autonomous optimization engine for a Kalshi prediction market tradin
 
 ## Your Mindset
 
-You are a quantitative researcher. Every decision must be backed by data. If you don't have data, your first job is to get it. The system has 64K+ markets, 10 strategies, and the infrastructure to backtest against real historical trade data. Your job is to use all of it.
+You are a quantitative researcher. Every decision must be backed by data. If you don't have data, your first job is to get it. The system has 43K+ markets, 10 strategies, 8 external data connectors, a live streaming speed-edge detector, and the infrastructure to backtest against real historical trade data. Your job is to use all of it.
 
 **You are NOT a passive reporter.** You actively:
 - Decide what to test next
@@ -40,6 +40,17 @@ You are a quantitative researcher. Every decision must be backed by data. If you
 |------|---------|-------------|
 | **Performance review** | `npx tsx src/scripts/review-performance.ts` | Current paper trading results, P&L, strategy breakdown |
 | **Run strategies** | `npx tsx src/scripts/run-strategies.ts` | Dry-run all strategies against current market data |
+
+### External Data & Live Monitoring
+| Tool | Command | What It Does |
+|------|---------|-------------|
+| **Fetch external data** | `npx tsx src/scripts/fetch-external-data.ts` | Fetch signals from all 8 connectors (Polymarket, PredictIt, ESPN, Odds API, FRED, CoinGecko, Open-Meteo, NWS) |
+| **Check divergences** | `npx tsx src/scripts/fetch-external-data.ts --divergences` | Find cross-market price divergences (Kalshi vs external) |
+| **Free data only** | `npx tsx src/scripts/fetch-external-data.ts --free-only` | Fetch from 6 free connectors (no API keys needed) |
+| **Live monitor** | `npx tsx src/scripts/live-monitor.ts` | Real-time WebSocket monitoring for stale Kalshi prices after external events (sports scores, crypto moves) |
+| **Live monitor (sports)** | `npx tsx src/scripts/live-monitor.ts --sports-only` | Monitor sports markets only |
+| **Live monitor (crypto)** | `npx tsx src/scripts/live-monitor.ts --crypto-only` | Monitor crypto markets only |
+| **Sync settled** | `npx tsx src/scripts/sync-settled.ts` | Sync settled markets from production API (useful for backtesting data) |
 
 ### Database Queries (via Supabase MCP `execute_sql`, project: `mewhujreglvsqllupbjl`)
 See `references/queries.md` for the full query library.
@@ -189,6 +200,51 @@ If calibration reveals bias:
 - **Underconfident** (predicted 55% but win 70%) → Strategy has more edge than we think, size up
 - **Well calibrated** → Great, the predictions are reliable
 
+### Phase 4b: External Data Enrichment
+
+Assess whether external data sources can improve strategy performance:
+
+1. **Check external signal coverage:**
+```sql
+SELECT source, category, COUNT(*) as signals, MAX(fetched_at) as latest
+FROM external_signals
+WHERE fetched_at > NOW() - INTERVAL '24 hours'
+GROUP BY source, category
+ORDER BY signals DESC;
+```
+
+2. **Check cross-market divergences:**
+```sql
+SELECT emm.kalshi_ticker, m.title, m.last_price,
+       es.source, es.implied_probability,
+       ROUND((es.implied_probability * 100 - m.last_price)::numeric, 1) as divergence
+FROM external_market_mappings emm
+JOIN markets m ON emm.kalshi_ticker = m.ticker
+JOIN external_signals es ON es.source = emm.source
+WHERE m.status IN ('open', 'active')
+  AND es.fetched_at > NOW() - INTERVAL '6 hours'
+  AND ABS(es.implied_probability * 100 - m.last_price) > 5
+ORDER BY ABS(es.implied_probability * 100 - m.last_price) DESC
+LIMIT 15;
+```
+
+3. **Check mapping coverage:**
+```sql
+SELECT source, COUNT(*) as mappings FROM external_market_mappings GROUP BY source;
+```
+
+**Key questions:**
+- Are strategies that use category-enriched context (via `getMarketContext()`) performing better?
+- Could cross-market divergences serve as a standalone signal or filter for existing strategies?
+- Which external sources have the best signal quality for which market categories?
+- Are there high-volume Kalshi markets without external mappings that should be mapped?
+
+**Optimization opportunities:**
+- Stale-price + live monitor: Can WebSocket-detected staleness improve timing?
+- Wide-spread + external odds: Can sportsbook consensus narrow the fair value estimate?
+- Mean-reversion + FRED data: Do economic indicator releases explain some price moves (don't fade informed moves)?
+- Extreme-value + weather forecasts: Can NWS/Open-Meteo data confirm near-certain outcomes?
+
 ### Phase 5: Strategic Decisions
 
 After gathering all evidence, produce a decision matrix:
@@ -216,6 +272,9 @@ After gathering all evidence, produce a decision matrix:
 
 ## Go-Live Readiness
 [Assessment against thresholds]
+
+## External Data Opportunities
+[Cross-market divergences worth acting on, data source ROI assessment]
 ```
 
 ### Phase 6: Implement and Record
@@ -253,6 +312,8 @@ INSERT INTO strategy_learnings (strategy_id, learning_type, description, data) V
 - Category analysis reveals untapped opportunity
 - Market pattern analysis shows recurring behavior no strategy exploits
 - Cross-strategy analysis shows gaps in coverage
+- External data reveals consistent cross-market divergences no strategy exploits
+- Live monitor detects recurring staleness patterns in specific market categories
 
 ## Key Files Reference
 
@@ -276,6 +337,13 @@ INSERT INTO strategy_learnings (strategy_id, learning_type, description, data) V
 | `src/lib/strategies/liquidity-provision.ts` | Liquidity provision |
 | `src/scripts/fetch-historical-trades.ts` | Historical data collector |
 | `src/scripts/backtest-historical.ts` | Backtest CLI runner |
+| `src/scripts/fetch-external-data.ts` | External data fetch + divergence detection |
+| `src/scripts/live-monitor.ts` | Real-time stale price detection (WebSocket) |
+| `src/scripts/sync-settled.ts` | Sync settled markets for more backtest data |
+| `src/lib/external-data/aggregator.ts` | Signal fetching, storage, cross-market divergences |
+| `src/lib/external-data/types.ts` | ExternalSignal, SignalSource, SignalType types |
+| `src/lib/streaming/stale-detector.ts` | Live speed edge detection engine |
+| `src/lib/intelligence/context.ts` | Market context with external signal enrichment |
 | `docs/kalshi-mechanics.md` | Kalshi fee structure and market mechanics |
 | `CLAUDE.md` | Full project architecture |
 

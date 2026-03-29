@@ -14,7 +14,50 @@ ORDER BY m.volume DESC
 LIMIT 30;
 ```
 
-## Step 2: Event cluster analysis
+## Step 2: Cross-market divergences (external data)
+Find Kalshi markets priced differently than Polymarket, PredictIt, or sportsbooks:
+```sql
+SELECT emm.kalshi_ticker, m.title as kalshi_title, m.last_price as kalshi_price,
+       es.source, es.title as external_title,
+       ROUND((es.implied_probability * 100)::numeric, 1) as external_price,
+       ROUND((es.implied_probability * 100 - m.last_price)::numeric, 1) as divergence_cents,
+       m.close_time, m.volume
+FROM external_market_mappings emm
+JOIN markets m ON emm.kalshi_ticker = m.ticker
+JOIN external_signals es ON es.source = emm.source
+WHERE m.status IN ('open', 'active')
+  AND es.fetched_at > NOW() - INTERVAL '6 hours'
+  AND ABS(es.implied_probability * 100 - m.last_price) > 5
+ORDER BY ABS(es.implied_probability * 100 - m.last_price) DESC
+LIMIT 20;
+```
+
+## Step 3: External signal highlights
+Check what's moving in external data sources:
+```sql
+-- Crypto signals with large moves
+SELECT source, title, data, fetched_at
+FROM external_signals
+WHERE category = 'crypto' AND signal_type = 'price'
+  AND fetched_at > NOW() - INTERVAL '6 hours'
+ORDER BY fetched_at DESC LIMIT 10;
+
+-- Sports odds with high confidence
+SELECT source, title, implied_probability, data, fetched_at
+FROM external_signals
+WHERE category = 'sports' AND signal_type = 'odds'
+  AND fetched_at > NOW() - INTERVAL '6 hours'
+ORDER BY fetched_at DESC LIMIT 10;
+
+-- Economic indicators
+SELECT source, title, signal_type, data, fetched_at
+FROM external_signals
+WHERE category = 'economics'
+  AND fetched_at > NOW() - INTERVAL '24 hours'
+ORDER BY fetched_at DESC LIMIT 10;
+```
+
+## Step 4: Event cluster analysis
 Look for events with multiple markets where pricing seems inconsistent:
 ```sql
 SELECT e.event_ticker, e.title, e.category,
@@ -31,7 +74,7 @@ ORDER BY MAX(m.last_price) - MIN(m.last_price) DESC
 LIMIT 20;
 ```
 
-## Step 3: Recent price movers
+## Step 5: Recent price movers
 ```sql
 SELECT ps.ticker, m.title,
        MIN(ps.last_price) as low_24h,
@@ -47,25 +90,27 @@ ORDER BY range_24h DESC
 LIMIT 20;
 ```
 
-## Step 4: Open position check
+## Step 6: Open position check
 Verify our existing positions are still valid:
 ```sql
 SELECT pt.ticker, pt.side, pt.price, pt.cost, pt.created_at,
-       m.last_price, m.yes_bid, m.yes_ask, m.close_time, m.result
+       m.last_price, m.yes_bid, m.yes_ask, m.close_time, m.result,
+       pt.strategy_id
 FROM paper_trades pt
 JOIN markets m ON pt.ticker = m.ticker
 WHERE pt.status = 'open'
 ORDER BY pt.created_at DESC;
 ```
 
-## Step 5: News context
-Search the web for breaking news relevant to the top opportunity categories found above (politics, crypto, economics, weather, etc.).
+## Step 7: News context
+Search the web for breaking news relevant to the top opportunity categories found above (politics, crypto, economics, weather, sports, etc.).
 
-## Step 6: Rank and recommend
+## Step 8: Rank and recommend
 Output a ranked list of the **top 5 opportunities** with:
 - Ticker and market title
 - Current price and suggested fair value
 - Side (yes/no) and reasoning
+- **External data support** (do Polymarket/sportsbooks/economic data agree?)
 - Confidence level and edge size
 - Risk factors
 
