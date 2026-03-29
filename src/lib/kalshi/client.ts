@@ -105,6 +105,9 @@ function signRequest(
   return signature.toString("base64");
 }
 
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 1000;
+
 async function kalshiFetch<T>(
   method: string,
   endpoint: string,
@@ -117,26 +120,36 @@ async function kalshiFetch<T>(
     Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
   }
 
-  const timestamp = Math.floor(Date.now() / 1000);
-  const requestPath = url.pathname + url.search;
-  const signature = signRequest(config.privateKeyPem, timestamp, method, requestPath);
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const requestPath = url.pathname + url.search;
+    const signature = signRequest(config.privateKeyPem, timestamp, method, requestPath);
 
-  const response = await fetch(url.toString(), {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-      "KALSHI-ACCESS-KEY": config.keyId,
-      "KALSHI-ACCESS-SIGNATURE": signature,
-      "KALSHI-ACCESS-TIMESTAMP": timestamp.toString(),
-    },
-  });
+    const response = await fetch(url.toString(), {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "KALSHI-ACCESS-KEY": config.keyId,
+        "KALSHI-ACCESS-SIGNATURE": signature,
+        "KALSHI-ACCESS-TIMESTAMP": timestamp.toString(),
+      },
+    });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Kalshi API ${response.status}: ${text}`);
+    if (response.status === 429 && attempt < MAX_RETRIES) {
+      const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      continue;
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Kalshi API ${response.status}: ${text}`);
+    }
+
+    return response.json() as Promise<T>;
   }
 
-  return response.json() as Promise<T>;
+  throw new Error(`Kalshi API: max retries exceeded for ${endpoint}`);
 }
 
 export async function getMarkets(
@@ -159,6 +172,7 @@ export async function getMarkets(
 export async function getAllActiveMarkets(): Promise<KalshiMarket[]> {
   const all: KalshiMarket[] = [];
   let cursor: string | undefined;
+  let page = 0;
 
   do {
     const response = await getMarkets({
@@ -168,6 +182,11 @@ export async function getAllActiveMarkets(): Promise<KalshiMarket[]> {
     });
     all.push(...response.markets);
     cursor = response.cursor || undefined;
+    page++;
+    // Pace requests to stay under rate limits (10 req/s safe margin)
+    if (cursor && page % 5 === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
   } while (cursor);
 
   return all;
@@ -185,7 +204,10 @@ export async function getSettledMarkets(limit: number = 500): Promise<KalshiMark
     });
     all.push(...response.markets);
     cursor = response.cursor || undefined;
-  } while (cursor || all.length >= limit);
+    if (cursor) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  } while (cursor && all.length < limit);
 
   return all.slice(0, limit);
 }

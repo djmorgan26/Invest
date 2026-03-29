@@ -16,20 +16,17 @@ export default async function ExternalDataPage() {
   const supabase = createServerClient();
   const now = new Date().toISOString();
 
+  // Fetch recent signals per source so every category is represented in the feed
+  const signalFields = "source, signal_type, category, title, implied_probability, data, fetched_at, expires_at";
+  const perSourceLimit = 15;
+
   const [
-    recentSignalsRes,
     sourceStatsRes,
     categoryRes,
     mappingsRes,
     totalCountRes,
+    ...perSourceResults
   ] = await Promise.all([
-    // Latest 100 signals for feed + charts
-    supabase
-      .from("external_signals")
-      .select("source, signal_type, category, title, implied_probability, data, fetched_at, expires_at")
-      .order("fetched_at", { ascending: false })
-      .limit(100),
-
     // All signals for per-source stats (just source + timestamp)
     supabase
       .from("external_signals")
@@ -42,7 +39,7 @@ export default async function ExternalDataPage() {
       .from("external_signals")
       .select("category, source")
       .or(`expires_at.is.null,expires_at.gt.${now}`)
-      .limit(3000),
+      .limit(5000),
 
     // Mappings count
     supabase
@@ -53,9 +50,22 @@ export default async function ExternalDataPage() {
     supabase
       .from("external_signals")
       .select("*", { count: "exact", head: true }),
+
+    // Per-source recent signals
+    ...EXPECTED_SOURCES.map((source) =>
+      supabase
+        .from("external_signals")
+        .select(signalFields)
+        .eq("source", source)
+        .order("fetched_at", { ascending: false })
+        .limit(perSourceLimit)
+    ),
   ]);
 
-  const recentSignals = recentSignalsRes.data ?? [];
+  // Merge per-source signals and sort by recency
+  const recentSignals = perSourceResults
+    .flatMap((r) => r.data ?? [])
+    .sort((a, b) => new Date(b.fetched_at).getTime() - new Date(a.fetched_at).getTime());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allSourceData: any[] = sourceStatsRes.data ?? [];
   const totalSignals = totalCountRes.count ?? 0;

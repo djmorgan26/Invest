@@ -10,10 +10,8 @@ export async function GET() {
   const [
     signalCountsRes,
     recentSignalsRes,
-    sourceStatsRes,
     divergencesRes,
     mappingsCountRes,
-    categoryBreakdownRes,
   ] = await Promise.all([
     // Total signal count
     supabase
@@ -27,13 +25,6 @@ export async function GET() {
       .order("fetched_at", { ascending: false })
       .limit(50),
 
-    // Per-source stats: latest fetch time + signal counts
-    supabase
-      .from("external_signals")
-      .select("source, fetched_at")
-      .order("fetched_at", { ascending: false })
-      .limit(5000),
-
     // Cross-market divergences (signals that have Kalshi ticker mappings)
     supabase
       .from("external_market_mappings")
@@ -43,40 +34,55 @@ export async function GET() {
     supabase
       .from("external_market_mappings")
       .select("*", { count: "exact", head: true }),
-
-    // Category breakdown
-    supabase
-      .from("external_signals")
-      .select("category, source, implied_probability")
-      .or(`expires_at.is.null,expires_at.gt.${now}`)
-      .order("fetched_at", { ascending: false })
-      .limit(2000),
   ]);
 
-  // Build per-source stats
-  const allSignals = sourceStatsRes.data ?? [];
-  const sourceStats: Record<string, { count: number; latest: string | null; stale: boolean }> = {};
-
+  // Build per-source stats using individual queries (avoids row limit issues)
   const expectedSources = [
     "polymarket", "predictit", "espn", "odds_api", "fred", "coingecko", "open_meteo", "nws",
   ];
 
-  for (const source of expectedSources) {
-    const sourceSignals = allSignals.filter((s) => s.source === source);
-    const latest = sourceSignals.length > 0 ? sourceSignals[0].fetched_at : null;
-    const stale = !latest || (Date.now() - new Date(latest).getTime()) > 30 * 60 * 1000; // >30 min old
-    sourceStats[source] = { count: sourceSignals.length, latest, stale };
+  const sourceStatsPromises = expectedSources.map(async (source) => {
+    const [countRes, latestRes] = await Promise.all([
+      supabase
+        .from("external_signals")
+        .select("*", { count: "exact", head: true })
+        .eq("source", source),
+      supabase
+        .from("external_signals")
+        .select("fetched_at")
+        .eq("source", source)
+        .order("fetched_at", { ascending: false })
+        .limit(1),
+    ]);
+
+    const count = countRes.count ?? 0;
+    const latest = latestRes.data?.[0]?.fetched_at ?? null;
+    const stale = !latest || (Date.now() - new Date(latest).getTime()) > 30 * 60 * 1000;
+    return { source, count, latest, stale };
+  });
+
+  const sourceStatsArray = await Promise.all(sourceStatsPromises);
+  const sourceStats: Record<string, { count: number; latest: string | null; stale: boolean }> = {};
+  for (const s of sourceStatsArray) {
+    sourceStats[s.source] = { count: s.count, latest: s.latest, stale: s.stale };
   }
 
-  // Build category breakdown
-  const catSignals = categoryBreakdownRes.data ?? [];
+  // Build category breakdown from non-expired signals
+  const catRes = await supabase
+    .from("external_signals")
+    .select("category, source")
+    .or(`expires_at.is.null,expires_at.gt.${now}`)
+    .order("fetched_at", { ascending: false })
+    .limit(5000);
+
+  const catSignals = catRes.data ?? [];
   const categoryStats: Record<string, { count: number; sources: string[] }> = {};
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const s of catSignals as any[]) {
-    if (!categoryStats[s.category]) categoryStats[s.category] = { count: 0, sources: [] };
-    categoryStats[s.category].count++;
-    if (!categoryStats[s.category].sources.includes(s.source)) {
-      categoryStats[s.category].sources.push(s.source);
+  for (const s of catSignals) {
+    const cat = s.category ?? "unknown";
+    if (!categoryStats[cat]) categoryStats[cat] = { count: 0, sources: [] };
+    categoryStats[cat].count++;
+    if (!categoryStats[cat].sources.includes(s.source)) {
+      categoryStats[cat].sources.push(s.source);
     }
   }
 
