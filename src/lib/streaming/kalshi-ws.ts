@@ -17,7 +17,7 @@ import WebSocket from "ws";
 import type { KalshiOrderbookUpdate } from "./types";
 
 const DEMO_WS = "wss://demo-api.kalshi.co/trade-api/ws/v2";
-const PROD_WS = "wss://api.elections.kalshi.com/trade-api/ws/v2";
+const PROD_WS = "wss://trading-api.kalshi.com/trade-api/ws/v2";
 
 function loadKalshiConfig() {
   const isDemo = (process.env.KALSHI_API_BASE_URL || "").includes("demo");
@@ -66,6 +66,7 @@ export class KalshiStream {
   private listeners: ((update: KalshiOrderbookUpdate) => void)[] = [];
   private tradeListeners: ((trade: { ticker: string; price: number; count: number; taker_side: string; timestamp: number }) => void)[] = [];
   private subscribedTickers: string[] = [];
+  private subscriptionIds: number[] = []; // Server-assigned subscription IDs
   private shouldRun = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private msgId = 1;
@@ -97,10 +98,34 @@ export class KalshiStream {
     console.log("[Kalshi WS] Stopped");
   }
 
+  /** Replace all subscribed tickers. Reconnects if needed. */
   updateTickers(tickers: string[]): void {
     this.subscribedTickers = tickers;
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.subscribe();
+    }
+  }
+
+  /** Dynamically add tickers to the existing subscription without reconnecting. */
+  addTickers(tickers: string[]): void {
+    const newTickers = tickers.filter((t) => !this.subscribedTickers.includes(t));
+    if (newTickers.length === 0) return;
+    this.subscribedTickers.push(...newTickers);
+
+    if (this.ws?.readyState === WebSocket.OPEN && this.subscriptionIds.length > 0) {
+      // Use Kalshi's update_subscription command for efficient dynamic adds
+      this.ws.send(
+        JSON.stringify({
+          id: this.msgId++,
+          cmd: "update_subscription",
+          params: {
+            sids: this.subscriptionIds,
+            action: "add_markets",
+            market_tickers: newTickers,
+          },
+        })
+      );
+      console.log(`[Kalshi WS] Added ${newTickers.length} tickers dynamically`);
     }
   }
 
@@ -109,7 +134,8 @@ export class KalshiStream {
 
     try {
       const config = loadKalshiConfig();
-      const timestamp = Math.floor(Date.now() / 1000);
+      // Kalshi WS requires timestamp in milliseconds (unlike REST which uses seconds)
+      const timestamp = Date.now();
       const signature = signWsRequest(config.privateKeyPem, timestamp);
 
       console.log("[Kalshi WS] Connecting...");
@@ -153,6 +179,7 @@ export class KalshiStream {
   private subscribe(): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
     if (this.subscribedTickers.length === 0) return;
+    this.subscriptionIds = []; // Reset on fresh subscribe
 
     // Subscribe to orderbook deltas
     this.ws.send(
@@ -195,6 +222,11 @@ export class KalshiStream {
 
   private handleMessage(msg: Record<string, unknown>): void {
     const type = msg.type as string;
+
+    // Track subscription IDs from server confirmations
+    if (type === "subscribed" && typeof msg.sid === "number") {
+      this.subscriptionIds.push(msg.sid as number);
+    }
 
     if (type === "orderbook_snapshot" || type === "orderbook_delta") {
       const ticker = msg.market_ticker as string;
