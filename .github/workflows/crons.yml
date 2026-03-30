@@ -2,26 +2,30 @@ name: Strategy Engine Crons
 
 on:
   schedule:
-    # Market sync — every 6 hours
-    - cron: '0 */6 * * *'
-    # Price snapshots — every 5 minutes
+    # IMPORTANT: Each cron must have UNIQUE trigger minutes to avoid GitHub Actions
+    # schedule collision. When multiple crons fire at the same minute, GitHub picks
+    # one and skips the rest. Every schedule below uses distinct minute offsets.
+    #
+    # Price snapshots — every 5 minutes (:00,:05,:10,...)
     - cron: '*/5 * * * *'
-    # Strategy scan + auto-trade — every 5 minutes
+    # Strategy scan + auto-trade — every 5 minutes (:01,:06,:11,...)
     - cron: '1,6,11,16,21,26,31,36,41,46,51,56 * * * *'
-    # Trade resolution — every 30 minutes
-    - cron: '*/30 * * * *'
-    # Portfolio snapshot — every hour
-    - cron: '0 * * * *'
-    # Strategy tuning — weekly Sunday midnight
-    - cron: '0 0 * * 0'
-    # External data fetch — every 15 minutes
-    - cron: '*/15 * * * *'
-    # Alert check — every 5 minutes (stale price detection + email alerts)
+    # Alert check — every 5 minutes (:02,:07,:12,...)
     - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
-    # Historical trade fetch — daily at 2am
-    - cron: '0 2 * * *'
-    # Refresh market mappings (Polymarket↔Kalshi) — every 6 hours
-    - cron: '30 */6 * * *'
+    # External data fetch — every 15 minutes (:03,:18,:33,:48)
+    - cron: '3,18,33,48 * * * *'
+    # Trade resolution — every 30 minutes (:04,:34)
+    - cron: '4,34 * * * *'
+    # Portfolio snapshot — every hour (:08)
+    - cron: '8 * * * *'
+    # Market sync — every 6 hours (:09)
+    - cron: '9 */6 * * *'
+    # Strategy tuning — weekly Sunday midnight (:13)
+    - cron: '13 0 * * 0'
+    # Historical trade fetch — daily at 2:14am
+    - cron: '14 2 * * *'
+    # Refresh market mappings — every 6 hours (:38)
+    - cron: '38 */6 * * *'
   workflow_dispatch:
     inputs:
       job:
@@ -44,7 +48,7 @@ on:
 
 jobs:
   sync:
-    if: github.event.schedule == '0 */6 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'sync' || inputs.job == 'all'))
+    if: github.event.schedule == '9 */6 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'sync' || inputs.job == 'all'))
     runs-on: ubuntu-latest
     steps:
       - name: Sync markets (chunked — resumes via cursor)
@@ -108,7 +112,7 @@ jobs:
           fi
 
   resolve:
-    if: github.event.schedule == '*/30 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'resolve' || inputs.job == 'all'))
+    if: github.event.schedule == '4,34 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'resolve' || inputs.job == 'all'))
     runs-on: ubuntu-latest
     steps:
       - name: Resolve trades
@@ -123,7 +127,7 @@ jobs:
           fi
 
   portfolio:
-    if: github.event.schedule == '0 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'portfolio' || inputs.job == 'all'))
+    if: github.event.schedule == '8 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'portfolio' || inputs.job == 'all'))
     runs-on: ubuntu-latest
     steps:
       - name: Portfolio snapshot
@@ -138,7 +142,7 @@ jobs:
           fi
 
   tune:
-    if: github.event.schedule == '0 0 * * 0' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'tune' || inputs.job == 'all'))
+    if: github.event.schedule == '13 0 * * 0' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'tune' || inputs.job == 'all'))
     runs-on: ubuntu-latest
     steps:
       - name: Tune strategies
@@ -184,7 +188,7 @@ jobs:
           fi
 
   external-data:
-    if: github.event.schedule == '*/15 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'external-data' || inputs.job == 'all'))
+    if: github.event.schedule == '3,18,33,48 * * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'external-data' || inputs.job == 'all'))
     runs-on: ubuntu-latest
     steps:
       - name: Fetch external data signals
@@ -200,7 +204,7 @@ jobs:
           fi
 
   fetch-history:
-    if: github.event.schedule == '0 2 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'fetch-history' || inputs.job == 'all'))
+    if: github.event.schedule == '14 2 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'fetch-history' || inputs.job == 'all'))
     runs-on: ubuntu-latest
     steps:
       - name: Fetch historical trade data
@@ -215,7 +219,7 @@ jobs:
           fi
 
   refresh-mappings:
-    if: github.event.schedule == '30 */6 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'refresh-mappings' || inputs.job == 'all'))
+    if: github.event.schedule == '38 */6 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'refresh-mappings' || inputs.job == 'all'))
     runs-on: ubuntu-latest
     steps:
       - name: Refresh Polymarket↔Kalshi market mappings
