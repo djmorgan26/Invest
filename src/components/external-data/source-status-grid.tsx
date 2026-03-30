@@ -122,21 +122,11 @@ function SourceCard({ info, stats }: { info: SourceInfo; stats?: { count: number
 }
 
 export function SourceStatusGrid({ sourceStats }: SourceStatusGridProps) {
-  const kalshi = SOURCES.find((s) => s.source === "kalshi")!;
-  const external = SOURCES.filter((s) => s.source !== "kalshi");
-
   return (
-    <div className="space-y-4">
-      {/* Primary exchange — full width */}
-      <SourceCard info={kalshi} stats={sourceStats[kalshi.source]} />
-
-      {/* External data sources */}
-      <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">External Sources</p>
-      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        {external.map((info) => (
-          <SourceCard key={info.source} info={info} stats={sourceStats[info.source]} />
-        ))}
-      </div>
+    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      {SOURCES.map((info) => (
+        <SourceCard key={info.source} info={info} stats={sourceStats[info.source]} />
+      ))}
     </div>
   );
 }
