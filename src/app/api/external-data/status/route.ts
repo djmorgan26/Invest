@@ -57,7 +57,7 @@ export async function GET() {
 
     const count = countRes.count ?? 0;
     const latest = latestRes.data?.[0]?.fetched_at ?? null;
-    const stale = !latest || (Date.now() - new Date(latest).getTime()) > 60 * 60 * 1000; // 1 hour
+    const stale = !latest || (Date.now() - new Date(latest).getTime()) > 2 * 60 * 60 * 1000; // 2 hours
     return { source, count, latest, stale };
   });
 

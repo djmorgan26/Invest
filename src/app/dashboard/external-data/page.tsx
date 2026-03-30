@@ -60,7 +60,7 @@ export default async function ExternalDataPage() {
     .sort((a, b) => new Date(b.fetched_at).getTime() - new Date(a.fetched_at).getTime());
   const totalSignals = totalCountRes.count ?? 0;
   const totalMappings = mappingsRes.count ?? 0;
-  const STALE_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour — cron runs every 15min
+  const STALE_THRESHOLD_MS = 2 * 60 * 60 * 1000; // 2 hours — cron runs every 15min, generous buffer
 
   // Build per-source stats using per-source queries for accurate counts
   const sourceStatsPromises = EXPECTED_SOURCES.map(async (source) => {
