@@ -186,18 +186,96 @@ async function main() {
   const args = process.argv.slice(2);
   const maxMarkets = parseInt(args.find((a) => a.startsWith("--max="))?.split("=")[1] ?? "200");
   const minVolume = parseInt(args.find((a) => a.startsWith("--min-volume="))?.split("=")[1] ?? "100");
+  const category = args.find((a) => a.startsWith("--category="))?.split("=")[1];
+  const listCategories = args.includes("--list-categories");
 
-  console.log(`Fetching historical trades for settled markets (max=${maxMarkets}, minVol=${minVolume})`);
+  // --list-categories: show distribution of settled markets by category and exit
+  if (listCategories) {
+    const { data: rows } = await supabase.rpc("exec_sql", {
+      sql: `SELECT e.category, COUNT(*) as market_count,
+             COUNT(*) FILTER (WHERE m.result IS NOT NULL AND m.result != '') as settled_count,
+             ROUND(AVG(m.volume)) as avg_volume,
+             MAX(m.close_time) as latest_close
+             FROM events e JOIN markets m ON e.event_ticker = m.event_ticker
+             GROUP BY e.category ORDER BY settled_count DESC`
+    });
+    // Fallback: direct query if RPC doesn't exist
+    if (!rows) {
+      // Use two queries to approximate
+      const { data: events } = await supabase
+        .from("events")
+        .select("event_ticker, category");
+      const { data: markets } = await supabase
+        .from("markets")
+        .select("event_ticker, volume, result")
+        .not("result", "is", null)
+        .neq("result", "")
+        .limit(10000);
 
-  // Find settled markets — first try DB, then fetch from Kalshi API if needed
-  // The DB may have stale result/volume data, so also fetch recently closed markets
-  let { data: settledMarkets, error: settledErr } = await supabase
+      if (events && markets) {
+        const catMap = new Map<string, string>();
+        for (const e of events) catMap.set(e.event_ticker, e.category ?? "unknown");
+
+        const stats = new Map<string, { count: number; totalVol: number }>();
+        for (const m of markets) {
+          const cat = catMap.get(m.event_ticker) ?? "unknown";
+          const s = stats.get(cat) ?? { count: 0, totalVol: 0 };
+          s.count++;
+          s.totalVol += m.volume ?? 0;
+          stats.set(cat, s);
+        }
+
+        console.log("\nSettled markets by category:");
+        console.log("Category".padEnd(20) + "Settled".padStart(8) + "Avg Volume".padStart(12));
+        console.log("-".repeat(40));
+        for (const [cat, s] of [...stats.entries()].sort((a, b) => b[1].count - a[1].count)) {
+          console.log(
+            cat.padEnd(20) +
+            String(s.count).padStart(8) +
+            String(Math.round(s.totalVol / s.count)).padStart(12)
+          );
+        }
+      }
+    } else {
+      console.log("\nSettled markets by category:");
+      console.log(JSON.stringify(rows, null, 2));
+    }
+    return;
+  }
+
+  console.log(`Fetching historical trades for settled markets (max=${maxMarkets}, minVol=${minVolume}${category ? `, category=${category}` : ""})`);
+
+  // If category specified, get event tickers for that category
+  let categoryEventTickers: string[] | null = null;
+  if (category) {
+    const { data: events } = await supabase
+      .from("events")
+      .select("event_ticker")
+      .ilike("category", category);
+    categoryEventTickers = events?.map((e) => e.event_ticker) ?? [];
+    console.log(`Found ${categoryEventTickers.length} events in category "${category}"`);
+    if (categoryEventTickers.length === 0) {
+      console.log("No events found for this category. Try --list-categories to see available categories.");
+      return;
+    }
+  }
+
+  // Find settled markets — order by volume DESC to get high-trade-count markets first
+  let query = supabase
     .from("markets")
     .select("ticker, event_ticker, title, volume, close_time, result")
     .not("result", "is", null)
     .neq("result", "")
-    .order("close_time", { ascending: false })
+    .gte("volume", minVolume)
+    .order("volume", { ascending: false })
     .limit(maxMarkets * 3);
+
+  if (categoryEventTickers) {
+    // Supabase .in() has a limit, batch if needed
+    query = query.in("event_ticker", categoryEventTickers.slice(0, 500));
+  }
+
+  let { data: settledMarkets, error: settledErr } = await query;
 
   if (settledErr) {
     console.error("Failed to query settled markets:", settledErr.message);

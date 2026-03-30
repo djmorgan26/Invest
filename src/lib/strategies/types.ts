@@ -11,6 +11,9 @@ export interface Opportunity {
   edge: number;
   reasoning: string;
   quantity: number;
+  /** "maker" = strategy assumes limit-order entry near midpoint (skip taker slippage override).
+   *  "taker" or undefined = default taker entry using live yes_ask/yes_bid. */
+  entry_type?: "maker" | "taker";
 }
 
 export interface Strategy {

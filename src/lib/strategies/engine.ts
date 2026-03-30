@@ -178,6 +178,14 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
     openByTicker.add(t.ticker);
   }
 
+  // Track which filter kills opportunities, grouped by strategy
+  const filterStats = new Map<string, Map<string, number>>();
+  const incrFilter = (strategyId: string, filterName: string) => {
+    if (!filterStats.has(strategyId)) filterStats.set(strategyId, new Map());
+    const m = filterStats.get(strategyId)!;
+    m.set(filterName, (m.get(filterName) ?? 0) + 1);
+  };
+
   for (const opp of opportunities) {
     // Get current market data for accurate pricing
     const { data: market } = await supabase
@@ -186,42 +194,58 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
       .eq("ticker", opp.ticker)
       .single();
 
-    // Calculate actual entry price (what we'd pay as a taker)
-    let entryPrice = opp.side === "yes"
-      ? (market?.yes_ask ?? opp.fair_value * 100) / 100
-      : (100 - (market?.yes_bid ?? (1 - opp.fair_value) * 100)) / 100;
+    // For maker-style strategies (e.g., liquidity-provision), use the strategy's
+    // own entry price — they assume limit-order fills near midpoint, not taker fills.
+    // For taker strategies (default), use live yes_ask/yes_bid.
+    let entryPrice: number;
+    if (opp.entry_type === "maker") {
+      // Strategy already computed a realistic maker entry price
+      entryPrice = opp.side === "yes"
+        ? opp.fair_value - opp.edge  // entry = fair_value - edge
+        : opp.fair_value - opp.edge;
+    } else {
+      // Default taker entry: use live market prices
+      entryPrice = opp.side === "yes"
+        ? (market?.yes_ask ?? opp.fair_value * 100) / 100
+        : (100 - (market?.yes_bid ?? (1 - opp.fair_value) * 100)) / 100;
+    }
 
     // --- SLIPPAGE ADJUSTMENT: use orderbook depth for realistic entry ---
-    const { data: latestOb } = await supabase
-      .from("orderbook_snapshots")
-      .select("depth_yes_bid, depth_yes_ask")
-      .eq("ticker", opp.ticker)
-      .order("snapshot_at", { ascending: false })
-      .limit(1)
-      .single();
+    // Skip slippage override for maker strategies — they don't take liquidity
+    if (opp.entry_type !== "maker") {
+      const { data: latestOb } = await supabase
+        .from("orderbook_snapshots")
+        .select("depth_yes_bid, depth_yes_ask")
+        .eq("ticker", opp.ticker)
+        .order("snapshot_at", { ascending: false })
+        .limit(1)
+        .single();
 
-    if (latestOb) {
-      const depthBid = (latestOb.depth_yes_bid ?? []) as DepthLevel[];
-      const depthAsk = (latestOb.depth_yes_ask ?? []) as DepthLevel[];
-      const slipEst = opp.side === "yes"
-        ? estimateSlippageYes(depthAsk, opp.quantity)
-        : estimateSlippageNo(depthBid, opp.quantity);
+      if (latestOb) {
+        const depthBid = (latestOb.depth_yes_bid ?? []) as DepthLevel[];
+        const depthAsk = (latestOb.depth_yes_ask ?? []) as DepthLevel[];
+        const slipEst = opp.side === "yes"
+          ? estimateSlippageYes(depthAsk, opp.quantity)
+          : estimateSlippageNo(depthBid, opp.quantity);
 
-      if (slipEst.canFill && slipEst.effectivePrice > 0) {
-        entryPrice = slipEst.effectivePrice;
-      }
+        if (slipEst.canFill && slipEst.effectivePrice > 0) {
+          entryPrice = slipEst.effectivePrice;
+        }
 
-      // Skip trade if slippage exceeds 3¢
-      if (slipEst.slippageCents > 3) {
-        details.push({ ...pick(opp), action: `skipped: slippage ${slipEst.slippageCents.toFixed(1)}¢ > 3¢ max` });
-        skipped++;
-        continue;
+        // Skip trade if slippage exceeds 3¢
+        if (slipEst.slippageCents > 3) {
+          details.push({ ...pick(opp), action: `skipped: slippage ${slipEst.slippageCents.toFixed(1)}¢ > 3¢ max` });
+          incrFilter(opp.strategy_id, "slippage");
+          skipped++;
+          continue;
+        }
       }
     }
 
     // --- GUARDRAIL: Entry price safety ---
     if (!isEntryPriceSafe(entryPrice, opp.strategy_id)) {
       details.push({ ...pick(opp), action: `skipped: entry price ${(entryPrice * 100).toFixed(0)}¢ outside safe range` });
+      incrFilter(opp.strategy_id, "entry_price_safety");
       skipped++;
       continue;
     }
@@ -230,6 +254,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
     const minEdge = minEdgeAfterFees(entryPrice);
     if (opp.edge < minEdge) {
       details.push({ ...pick(opp), action: `skipped: edge ${(opp.edge * 100).toFixed(1)}¢ < min ${(minEdge * 100).toFixed(1)}¢ (fees + buffer)` });
+      incrFilter(opp.strategy_id, "edge_vs_fees");
       skipped++;
       continue;
     }
@@ -237,6 +262,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
     // Don't double up on the same ticker (open positions)
     if (openByTicker.has(opp.ticker)) {
       details.push({ ...pick(opp), action: "skipped: already have position" });
+      incrFilter(opp.strategy_id, "duplicate_ticker");
       skipped++;
       continue;
     }
@@ -251,6 +277,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
       .single();
     if (recentTrade) {
       details.push({ ...pick(opp), action: "skipped: ticker traded within 48h" });
+      incrFilter(opp.strategy_id, "recent_trade_cooldown");
       skipped++;
       continue;
     }
@@ -259,6 +286,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
     const strategyOpen = openByStrategy.get(opp.strategy_id) ?? 0;
     if (strategyOpen >= MAX_OPEN_PER_STRATEGY) {
       details.push({ ...pick(opp), action: "skipped: strategy at max positions" });
+      incrFilter(opp.strategy_id, "max_positions");
       skipped++;
       continue;
     }
@@ -280,6 +308,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
 
     if (cost + fee > availableCapital || quantity <= 0) {
       details.push({ ...pick(opp), action: "skipped: insufficient capital" });
+      incrFilter(opp.strategy_id, "insufficient_capital");
       skipped++;
       continue;
     }
@@ -288,6 +317,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
     const ev = expectedValue(quantity, entryPrice, opp.fair_value);
     if (ev <= 0) {
       details.push({ ...pick(opp), action: `skipped: negative EV ($${ev.toFixed(2)}) after fees` });
+      incrFilter(opp.strategy_id, "negative_ev");
       skipped++;
       continue;
     }
@@ -296,6 +326,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
     const breakerResult = await checkCircuitBreakers(opp.ticker, opp.strategy_id);
     if (!breakerResult.allowed) {
       details.push({ ...pick(opp), action: `halted: ${breakerResult.reason}` });
+      incrFilter(opp.strategy_id, "circuit_breaker");
       skipped++;
       continue;
     }
@@ -356,6 +387,15 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
     openByStrategy.set(opp.strategy_id, strategyOpen + 1);
     openByTicker.add(opp.ticker);
     details.push({ ...pick(opp), action: `traded: ${quantity}x @ ${(entryPrice * 100).toFixed(0)}¢, cost=$${totalCost}, EV=$${ev.toFixed(2)}` });
+  }
+
+  // Log filter stats summary for debugging which guardrails are killing opportunities
+  if (filterStats.size > 0) {
+    const summary: Record<string, Record<string, number>> = {};
+    for (const [stratId, filters] of filterStats) {
+      summary[stratId] = Object.fromEntries(filters);
+    }
+    console.log("Filter stats by strategy:", JSON.stringify(summary));
   }
 
   return { trades_placed: tradesPlaced, predictions_written: predictionsWritten, skipped, details };

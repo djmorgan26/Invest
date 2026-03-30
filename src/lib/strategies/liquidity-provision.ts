@@ -214,6 +214,7 @@ export const liquidityProvision: Strategy = {
         confidence: Math.round(confidence * 100) / 100,
         fair_value: Math.round(fairValue * 10000) / 10000,
         edge: Math.round(edge * 10000) / 10000,
+        entry_type: "maker", // LP assumes limit-order entry near midpoint, not taker
         reasoning: `Liquidity provision: spread=${(spread * 100).toFixed(0)}¢, ` +
           `midpoint=${(midpoint * 100).toFixed(0)}¢, ` +
           `24h range=${vol ? (volRange * 100).toFixed(0) : "?"}¢ (stable). ` +
