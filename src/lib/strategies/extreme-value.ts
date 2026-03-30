@@ -56,6 +56,11 @@ export const extremeValue: Strategy = {
         side = "no";
         entryPrice = m.yes_bid != null ? (100 - m.yes_bid) / 100 : 1 - lastPrice;
 
+        // GUARD: verify the bid/ask also supports the extreme-value thesis
+        // If yes_bid diverges wildly from lastPrice, this isn't a real extreme value
+        const yesBidNorm = m.yes_bid != null ? m.yes_bid / 100 : lastPrice;
+        if (yesBidNorm > config.low_threshold * 3) continue; // bid too high for "extreme low"
+
         // Fair value of NO — closer to expiry with low YES price → very likely NO
         // Scale confidence by how close to expiry: 2h left at 3¢ → nearly certain
         const timeFactor = Math.min(1, Math.max(0, 1 - daysToClose / config.max_days_to_close));
@@ -66,6 +71,10 @@ export const extremeValue: Strategy = {
         // YES priced very high → bet YES (near-certain YES outcome)
         side = "yes";
         entryPrice = m.yes_ask != null ? m.yes_ask / 100 : lastPrice;
+
+        // GUARD: verify the ask also supports the extreme-value thesis
+        const yesAskNorm = m.yes_ask != null ? m.yes_ask / 100 : lastPrice;
+        if (yesAskNorm < config.high_threshold) continue; // ask too low for "extreme high"
 
         const timeFactor = Math.min(1, Math.max(0, 1 - daysToClose / config.max_days_to_close));
         fairValue = 0.95 + timeFactor * 0.04;

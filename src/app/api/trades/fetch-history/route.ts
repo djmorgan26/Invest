@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getTrades } from "@/lib/kalshi/client";
+import { normalizeTrade } from "@/lib/kalshi/types";
 
 export const maxDuration = 300; // 5 minute timeout for this route
 
@@ -48,16 +49,19 @@ export async function GET(request: NextRequest) {
         const trades = response.trades;
         if (trades.length === 0) continue;
 
-        // Store trades
-        const batch = trades.map((t) => ({
-          ticker: t.ticker,
-          trade_id: t.trade_id,
-          count: t.count,
-          yes_price: Math.round((t.yes_price ?? 0) * 100),
-          no_price: Math.round((t.no_price ?? 0) * 100),
-          taker_side: t.taker_side,
-          created_time: t.created_time,
-        }));
+        // Store trades — use normalizeTrade to handle both legacy and _dollars/_fp fields
+        const batch = trades.map((t) => {
+          const normalized = normalizeTrade(t);
+          return {
+            ticker: t.ticker,
+            trade_id: t.trade_id,
+            count: normalized.count,
+            yes_price: normalized.yes_price,
+            no_price: normalized.no_price,
+            taker_side: t.taker_side,
+            created_time: t.created_time,
+          };
+        });
 
         const { error: insertErr } = await supabase
           .from("market_trades")
@@ -69,8 +73,9 @@ export async function GET(request: NextRequest) {
           totalTrades += trades.length;
         }
 
-        // Build hourly candles
-        const sortedTrades = [...trades].sort(
+        // Build hourly candles using normalized trade data
+        const normalizedTrades = trades.map((t) => ({ ...t, ...normalizeTrade(t) }));
+        const sortedTrades = [...normalizedTrades].sort(
           (a, b) => new Date(a.created_time).getTime() - new Date(b.created_time).getTime()
         );
 
@@ -88,7 +93,7 @@ export async function GET(request: NextRequest) {
           bucket_start: string;
         }> = [];
 
-        const buckets = new Map<number, typeof trades>();
+        const buckets = new Map<number, typeof sortedTrades>();
         for (const trade of sortedTrades) {
           const ts = new Date(trade.created_time).getTime();
           const bucketStart = Math.floor(ts / hourMs) * hourMs;
@@ -97,9 +102,9 @@ export async function GET(request: NextRequest) {
         }
 
         for (const [bucketStart, bucketTrades] of buckets) {
-          const prices = bucketTrades.map((t) => Math.round((t.yes_price ?? 0) * 100));
-          const totalVol = bucketTrades.reduce((s, t) => s + (t.count ?? 0), 0);
-          const vwapNum = bucketTrades.reduce((s, t) => s + Math.round((t.yes_price ?? 0) * 100) * (t.count ?? 0), 0);
+          const prices = bucketTrades.map((t) => t.yes_price);
+          const totalVol = bucketTrades.reduce((s, t) => s + t.count, 0);
+          const vwapNum = bucketTrades.reduce((s, t) => s + t.yes_price * t.count, 0);
 
           candles.push({
             ticker: market.ticker,
@@ -123,7 +128,9 @@ export async function GET(request: NextRequest) {
 
         // Rate limit
         await new Promise((resolve) => setTimeout(resolve, 250));
-      } catch {
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error(`Failed to fetch trades for ${market.ticker}: ${errMsg}`);
         errors++;
       }
     }

@@ -234,9 +234,23 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
       continue;
     }
 
-    // Don't double up on the same ticker
+    // Don't double up on the same ticker (open positions)
     if (openByTicker.has(opp.ticker)) {
       details.push({ ...pick(opp), action: "skipped: already have position" });
+      skipped++;
+      continue;
+    }
+
+    // Don't re-enter a ticker that was recently traded (within 48h) — prevents churn
+    const { data: recentTrade } = await supabase
+      .from("paper_trades")
+      .select("id")
+      .eq("ticker", opp.ticker)
+      .gte("created_at", new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString())
+      .limit(1)
+      .single();
+    if (recentTrade) {
+      details.push({ ...pick(opp), action: "skipped: ticker traded within 48h" });
       skipped++;
       continue;
     }
