@@ -8,6 +8,9 @@
  *   npx tsx src/scripts/kill-switch.ts status
  */
 
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
 import {
   activateKillSwitch,
   deactivateKillSwitch,

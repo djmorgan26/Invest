@@ -4,8 +4,8 @@ import { isEntryPriceSafe, minEdgeAfterFees, riskRewardRatio } from "./kalshi-ma
 
 const STRATEGY_ID = "stale-price";
 const DEFAULT_CONFIG = {
-  min_sibling_settlement_hours: 1,
-  max_hours_since_settlement: 48,
+  min_sibling_settlement_hours: 0.5, // lowered from 1h — catch faster
+  max_hours_since_settlement: 72, // widened from 48h — more settlement window
 };
 
 function getConfig(dbConfig: StrategyConfig) {
@@ -72,7 +72,7 @@ export const stalePrice: Strategy = {
         // Check price stability — if price hasn't moved > 2¢ in recent snapshots
         const prices = snapshots.map((s) => s.last_price);
         const priceRange = Math.max(...prices) - Math.min(...prices);
-        if (priceRange > 5) continue; // price is already moving, not stale
+        if (priceRange > 12) continue; // price is already moving, not stale (was 5 — too strict)
 
         // The logic: if one sibling settled YES (e.g., "Team wins by 5+"),
         // related markets should reprice. If they haven't, there's an opportunity.
@@ -87,14 +87,14 @@ export const stalePrice: Strategy = {
         let side: "yes" | "no";
         let fairValue: number;
 
-        if (yesSettled > noSettled && lastPrice < 0.4) {
+        if (yesSettled > noSettled && lastPrice < 0.5) {
           // Siblings resolving YES suggests related markets should be higher
           side = "yes";
-          fairValue = Math.min(lastPrice + 0.10, 0.9);
-        } else if (noSettled > yesSettled && lastPrice > 0.6) {
+          fairValue = Math.min(lastPrice + 0.15, 0.9); // was +0.10, increased
+        } else if (noSettled > yesSettled && lastPrice > 0.5) {
           // Siblings resolving NO suggests related markets should be lower
           side = "no";
-          fairValue = Math.max(lastPrice - 0.10, 0.1);
+          fairValue = Math.max(lastPrice - 0.15, 0.1); // was -0.10, increased
         } else {
           continue;
         }
@@ -106,7 +106,7 @@ export const stalePrice: Strategy = {
 
         // Edge = fair value minus what we actually pay (not market price)
         const edge = fairValue - entryPrice;
-        if (edge < 0.05) continue;
+        if (edge < 0.03) continue; // lowered from 0.05 — 3¢ edge is viable
 
         // Guardrails
         if (!isEntryPriceSafe(entryPrice, STRATEGY_ID)) continue;

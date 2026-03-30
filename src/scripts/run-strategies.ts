@@ -1,10 +1,6 @@
 import { config } from "dotenv";
 config({ path: ".env.local" });
 
-// Must set module alias for @ imports used by strategy engine
-import { register } from "tsx/esm/api";
-register();
-
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(

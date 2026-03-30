@@ -67,7 +67,7 @@ export function minEdgeAfterFees(priceNorm: number): number {
   // Fee per contract as fraction of $1
   const feePerContract = Math.ceil(7 * priceNorm * (1 - priceNorm)) / 100;
   // Need edge > fee to be profitable. Add a buffer for safety.
-  return feePerContract + 0.02; // fee + 2¢ minimum buffer
+  return feePerContract + 0.01; // fee + 1¢ minimum buffer
 }
 
 /**

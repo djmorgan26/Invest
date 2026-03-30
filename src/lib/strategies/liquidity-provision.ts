@@ -30,9 +30,9 @@ const DEFAULT_CONFIG = {
   min_spread: 0.08,          // 8¢ minimum spread to cover both-side fees
   max_spread: 0.25,          // skip absurdly wide spreads (dead markets)
   min_volume: 30,            // needs some baseline activity
-  max_price_volatility: 0.08, // max 8¢ price range in 24h (stability filter)
+  max_price_volatility: 0.15, // raised from 8¢ to 15¢ — allow more volatile markets
   lookback_hours: 24,
-  min_depth_ratio: 1.5,      // orderbook asymmetry: lean toward deeper side
+  min_depth_ratio: 1.2,      // lowered from 1.5 — less picky about asymmetry
   max_days_to_close: 21,     // avoid near-expiry (prices move fast)
   min_days_to_close: 2,
   min_entry_price: 0.15,
@@ -185,8 +185,8 @@ export const liquidityProvision: Strategy = {
       // Fair value: midpoint IS our fair value estimate (market is balanced)
       // Our edge comes from entering better than the taker price
       const fairValue = side === "yes"
-        ? Math.min(0.85, midpoint + spread * 0.25) // slight lean toward our side
-        : Math.min(0.85, (1 - midpoint) + spread * 0.25);
+        ? Math.min(0.85, midpoint + spread * 0.35) // slight lean toward our side (was 0.25)
+        : Math.min(0.85, (1 - midpoint) + spread * 0.35);
 
       const edge = fairValue - entryPrice;
       if (edge <= 0) continue;
@@ -194,7 +194,7 @@ export const liquidityProvision: Strategy = {
 
       const feePerContract = takerFee(1, entryPrice);
       const netProfit = 1 - entryPrice - feePerContract;
-      if (netProfit < 0.03) continue;
+      if (netProfit < 0.02) continue; // lowered from 3¢ — 2¢ net profit is viable for spread capture
 
       // Stability-based confidence: less volatile = more reliable spread capture
       const volRange = vol ? (vol.max - vol.min) : config.max_price_volatility;

@@ -5,12 +5,12 @@ import { isEntryPriceSafe, minEdgeAfterFees, riskRewardRatio } from "./kalshi-ma
 const STRATEGY_ID = "wide-spread";
 const DEFAULT_CONFIG = {
   min_spread: 0.10, // 10¢ minimum spread
-  min_volume: 100,
+  min_volume: 30, // lowered from 100 — wide-spread candidates are often low-volume
   max_days_to_close: 14,
   // Tightened guardrails — backtesting showed 75¢ max is more profitable
   max_entry_price: 0.75, // never pay more than 75¢ (was 85¢ — too risky)
   min_entry_price: 0.15, // avoid longshots below 15¢ (was 10¢)
-  min_risk_reward: 0.35, // minimum reward/risk ratio (was 0.20 — allowed terrible trades)
+  min_risk_reward: 0.25, // lowered from 0.35 — accept 25% R/R to get more candidates
 };
 
 function getConfig(dbConfig: StrategyConfig) {

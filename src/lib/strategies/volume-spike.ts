@@ -4,9 +4,9 @@ import { isEntryPriceSafe, minEdgeAfterFees, riskRewardRatio } from "./kalshi-ma
 
 const STRATEGY_ID = "volume-spike";
 const DEFAULT_CONFIG = {
-  volume_multiplier: 2.0, // 2x baseline volume = spike
-  min_price_move: 0.03, // 3¢ minimum accompanying price move
-  momentum_factor: 0.3, // fair value = current + move * factor
+  volume_multiplier: 1.5, // lowered from 2.0 — 1.5x baseline = spike
+  min_price_move: 0.02, // lowered from 3¢ — 2¢ minimum accompanying price move
+  momentum_factor: 0.25, // lowered from 0.3 — slightly more conservative fair value estimate
   lookback_hours: 48, // baseline window
   min_volume: 50, // minimum absolute volume
   max_days_to_close: 14,

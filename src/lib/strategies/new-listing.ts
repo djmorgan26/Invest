@@ -24,12 +24,12 @@ const DEFAULT_CONFIG = {
   max_hours_since_listing: 48, // recently listed markets
   min_spread: 0.06,            // wide spread = no market maker yet = opportunity
   min_volume: 5,               // some activity (not completely dead)
-  max_volume: 500,             // not already well-discovered
+  max_volume: 1500,            // raised from 500 — new listings can gain traction quickly
   max_entry_price: 0.80,
   min_entry_price: 0.15,
   min_risk_reward: 0.25,
   sibling_weight: 0.70,       // how much to weight sibling-implied fair value
-  default_edge_estimate: 0.08, // assumed edge when siblings aren't informative
+  default_edge_estimate: 0.10, // raised from 0.08 — more aggressive fair value push for new listings
 };
 
 function getConfig(dbConfig: StrategyConfig) {
@@ -143,7 +143,7 @@ export const newListing: Strategy = {
       // Wide spread at 65¢ midpoint → someone knows it's likely YES
       const deviationFrom50 = midpoint - 0.50;
 
-      if (Math.abs(deviationFrom50) < 0.05 && Math.abs(siblingSignal) < 0.03) {
+      if (Math.abs(deviationFrom50) < 0.03 && Math.abs(siblingSignal) < 0.02) {
         // Price is very close to 50¢ with no sibling signal — skip, no edge
         continue;
       }
@@ -176,7 +176,7 @@ export const newListing: Strategy = {
 
       const feePerContract = takerFee(1, entryPrice);
       const netProfit = 1 - entryPrice - feePerContract;
-      if (netProfit < 0.03) continue;
+      if (netProfit < 0.02) continue; // lowered from 3¢ — 2¢ net profit acceptable for new listings
 
       // Lower confidence — this is a heuristic strategy
       const freshnessBoost = Math.min(0.05, (config.max_hours_since_listing - hoursSinceListing) / config.max_hours_since_listing * 0.05);
