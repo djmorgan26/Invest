@@ -7,6 +7,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  ReferenceLine,
   ResponsiveContainer,
 } from "recharts";
 import {
@@ -43,19 +44,70 @@ function filterByRange(snapshots: Snapshot[], range: TimeRange): Snapshot[] {
   );
 }
 
+function formatTime(date: Date, range: TimeRange): string {
+  if (range === "1d") {
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  if (range === "1w") {
+    return date.toLocaleDateString("en-US", {
+      weekday: "short",
+      hour: "numeric",
+    });
+  }
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export function HeroChart({ snapshots }: HeroChartProps) {
-  const [range, setRange] = useState<TimeRange>("all");
+  const [range, setRange] = useState<TimeRange>("1m");
 
   const data = useMemo(() => {
     const filtered = filterByRange(snapshots, range);
     return filtered.map((s) => ({
-      time: new Date(s.snapshot_at).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      }),
+      time: formatTime(new Date(s.snapshot_at), range),
       value: Number(s.total_value.toFixed(2)),
     }));
   }, [snapshots, range]);
+
+  const { yDomain, startValue } = useMemo(() => {
+    if (data.length === 0) return { yDomain: [0, 100] as [number, number], startValue: 0 };
+    const values = data.map((d) => d.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const spread = max - min;
+    const padding = Math.max(spread * 0.15, 5);
+    return {
+      yDomain: [
+        Math.floor((min - padding) / 5) * 5,
+        Math.ceil((max + padding) / 5) * 5,
+      ] as [number, number],
+      startValue: values[0],
+    };
+  }, [data]);
+
+  // Deduplicate adjacent identical x-axis labels
+  const deduped = useMemo(() => {
+    let lastLabel = "";
+    return data.map((d) => {
+      if (d.time === lastLabel) {
+        return { ...d, time: "" };
+      }
+      lastLabel = d.time;
+      return d;
+    });
+  }, [data]);
+
+  // Thin out labels so they don't overlap (~12 labels max)
+  const tickInterval = useMemo(() => {
+    const labelCount = deduped.filter((d) => d.time !== "").length;
+    if (labelCount <= 12) return undefined;
+    return Math.ceil(labelCount / 12);
+  }, [deduped]);
 
   if (data.length === 0) {
     return (
@@ -79,7 +131,7 @@ export function HeroChart({ snapshots }: HeroChartProps) {
       </div>
       <div className="h-48 w-full md:h-64">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data}>
+          <AreaChart data={deduped}>
             <defs>
               <linearGradient id="heroGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={strokeColor} stopOpacity={0.2} />
@@ -89,10 +141,12 @@ export function HeroChart({ snapshots }: HeroChartProps) {
             <XAxis
               dataKey="time"
               {...chartAxisProps}
-              interval="preserveStartEnd"
+              interval={tickInterval ?? "preserveStartEnd"}
             />
             <YAxis
               {...chartAxisProps}
+              domain={yDomain}
+              allowDecimals={false}
               tickFormatter={(v: number) => `$${v.toLocaleString()}`}
               width={70}
             />
@@ -103,6 +157,12 @@ export function HeroChart({ snapshots }: HeroChartProps) {
                 `$${value.toLocaleString()}`,
                 "Value",
               ]}
+            />
+            <ReferenceLine
+              y={startValue}
+              stroke={chartColors.axisText}
+              strokeDasharray="4 4"
+              strokeOpacity={0.5}
             />
             <Area
               type="monotone"
