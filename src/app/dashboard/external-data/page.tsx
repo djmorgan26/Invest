@@ -14,8 +14,6 @@ const EXPECTED_SOURCES = [
 
 export default async function ExternalDataPage() {
   const supabase = createServerClient();
-  const now = new Date().toISOString();
-
   // Fetch recent signals per source so every category is represented in the feed
   const signalFields = "source, signal_type, category, title, implied_probability, data, fetched_at, expires_at";
   const perSourceLimit = 15;
@@ -26,11 +24,10 @@ export default async function ExternalDataPage() {
     totalCountRes,
     ...perSourceResults
   ] = await Promise.all([
-    // Active signals by category
+    // All signals by category (no expiry filter — this shows coverage, not freshness)
     supabase
       .from("external_signals")
       .select("category, source")
-      .or(`expires_at.is.null,expires_at.gt.${now}`)
       .limit(5000),
 
     // Mappings count

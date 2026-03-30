@@ -4,7 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 const STARTING_BALANCE = 10000;
 const DAILY_LOSS_LIMIT = -500; // Halt all trading if daily P&L drops below this
 const DRAWDOWN_THRESHOLD = 0.10; // 10% from peak portfolio value → halt
-const MAX_PER_CATEGORY = 3; // Max open trades in any single category
+const MAX_PER_CATEGORY = 8; // Max open trades in any single category (raised from 3 to accelerate data collection)
 const MAX_CONSECUTIVE_LOSSES = 5; // Per-strategy consecutive loss limit
 
 export interface CircuitBreakerResult {
