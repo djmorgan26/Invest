@@ -177,7 +177,7 @@ jobs:
     steps:
       - name: Check for stale price opportunities + send email alerts
         run: |
-          HTTP_CODE=$(curl -sS --max-time 55 -o /tmp/response.txt -w "%{http_code}" \
+          HTTP_CODE=$(curl -sS --max-time 65 -o /tmp/response.txt -w "%{http_code}" \
             -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.APP_URL }}/api/alerts/check")
@@ -193,7 +193,7 @@ jobs:
     steps:
       - name: Fetch external data signals
         run: |
-          HTTP_CODE=$(curl -sS --max-time 110 -o /tmp/response.txt -w "%{http_code}" \
+          HTTP_CODE=$(curl -sS --max-time 130 -o /tmp/response.txt -w "%{http_code}" \
             -X POST \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "${{ secrets.APP_URL }}/api/external-data/fetch")

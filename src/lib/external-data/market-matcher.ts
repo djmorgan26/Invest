@@ -280,18 +280,20 @@ export async function refreshMarketMappings(): Promise<{
     });
   }
 
-  // Upsert mappings in batches
-  for (const mapping of mappings) {
+  // Upsert mappings in batches of 100
+  const batchSize = 100;
+  for (let i = 0; i < mappings.length; i += batchSize) {
+    const batch = mappings.slice(i, i + batchSize);
     const { error } = await supabase
       .from("external_market_mappings")
-      .upsert(mapping, {
+      .upsert(batch, {
         onConflict: "kalshi_ticker,source,external_id",
       });
 
     if (error) {
-      console.error(`[Matcher] Upsert error for ${mapping.kalshi_ticker}:`, error.message);
+      console.error(`[Matcher] Batch upsert error:`, error.message);
     } else {
-      created++;
+      created += batch.length;
     }
   }
 

@@ -161,26 +161,36 @@ export async function findCrossMarketDivergences(opts?: {
     external_title: string;
   }[] = [];
 
-  for (const mapping of mappings) {
-    // Get Kalshi price
-    const { data: market } = await supabase
-      .from("markets")
-      .select("last_price, yes_bid, yes_ask")
-      .eq("ticker", mapping.kalshi_ticker)
-      .single();
+  // Batch-fetch all mapped markets and signals (avoid N+1 queries)
+  const mappedTickers = [...new Set(mappings.map((m) => m.kalshi_ticker))];
+  const { data: markets } = await supabase
+    .from("markets")
+    .select("ticker, last_price, yes_bid, yes_ask")
+    .in("ticker", mappedTickers.slice(0, 500));
 
+  const marketByTicker = new Map((markets ?? []).map((m) => [m.ticker, m]));
+
+  const mappedSources = [...new Set(mappings.map((m) => m.source))];
+  const mappedExternalIds = [...new Set(mappings.map((m) => m.external_id))];
+  const { data: allSignals } = await supabase
+    .from("external_signals")
+    .select("*")
+    .in("source", mappedSources)
+    .in("external_id", mappedExternalIds.slice(0, 500))
+    .order("fetched_at", { ascending: false });
+
+  // Build lookup: source:external_id → latest signal
+  const signalLookup = new Map<string, NonNullable<typeof allSignals>[number]>();
+  for (const s of allSignals ?? []) {
+    const key = `${s.source}:${s.external_id}`;
+    if (!signalLookup.has(key)) signalLookup.set(key, s);
+  }
+
+  for (const mapping of mappings) {
+    const market = marketByTicker.get(mapping.kalshi_ticker);
     if (!market?.last_price) continue;
 
-    // Get latest external signal
-    const { data: signals } = await supabase
-      .from("external_signals")
-      .select("*")
-      .eq("source", mapping.source)
-      .eq("external_id", mapping.external_id)
-      .order("fetched_at", { ascending: false })
-      .limit(1);
-
-    const signal = signals?.[0];
+    const signal = signalLookup.get(`${mapping.source}:${mapping.external_id}`);
     if (!signal?.implied_probability) continue;
 
     const kalshiCents = market.last_price;

@@ -91,26 +91,39 @@ export async function POST(request: Request) {
     .select("*");
 
   if (mappings && mappings.length > 0) {
-    for (const mapping of mappings) {
-      const { data: market } = await supabase
-        .from("markets")
-        .select("ticker, title, last_price, yes_bid, yes_ask, updated_at")
-        .eq("ticker", mapping.kalshi_ticker)
-        .in("status", ["open", "active"])
-        .single();
+    // Batch-fetch all mapped markets and signals upfront (avoid N+1)
+    const mappedTickers = [...new Set(mappings.map((m) => m.kalshi_ticker))];
+    const { data: mappedMarkets } = await supabase
+      .from("markets")
+      .select("ticker, title, last_price, yes_bid, yes_ask, updated_at")
+      .in("ticker", mappedTickers.slice(0, 500))
+      .in("status", ["open", "active"]);
 
+    const marketByTicker = new Map((mappedMarkets ?? []).map((m) => [m.ticker, m]));
+
+    // Fetch all recent external signals for mapped sources
+    const mappedSources = [...new Set(mappings.map((m) => m.source))];
+    const mappedExternalIds = [...new Set(mappings.map((m) => m.external_id))];
+    const { data: allMappedSignals } = await supabase
+      .from("external_signals")
+      .select("implied_probability, source, external_id, title, data, fetched_at")
+      .in("source", mappedSources)
+      .in("external_id", mappedExternalIds.slice(0, 500))
+      .or(`expires_at.is.null,expires_at.gt.${now}`)
+      .order("fetched_at", { ascending: false });
+
+    // Build lookup: source:external_id → latest signal
+    const signalLookup = new Map<string, NonNullable<typeof allMappedSignals>[number]>();
+    for (const s of allMappedSignals ?? []) {
+      const key = `${s.source}:${s.external_id}`;
+      if (!signalLookup.has(key)) signalLookup.set(key, s);
+    }
+
+    for (const mapping of mappings) {
+      const market = marketByTicker.get(mapping.kalshi_ticker);
       if (!market?.last_price) continue;
 
-      const { data: signals } = await supabase
-        .from("external_signals")
-        .select("implied_probability, source, title, data, fetched_at")
-        .eq("source", mapping.source)
-        .eq("external_id", mapping.external_id)
-        .or(`expires_at.is.null,expires_at.gt.${now}`)
-        .order("fetched_at", { ascending: false })
-        .limit(1);
-
-      const signal = signals?.[0];
+      const signal = signalLookup.get(`${mapping.source}:${mapping.external_id}`);
       if (!signal?.implied_probability) continue;
 
       const kalshiCents = market.last_price;
