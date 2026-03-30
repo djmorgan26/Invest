@@ -163,8 +163,13 @@ export function MarketTable({ markets }: MarketTableProps) {
                         {market.ticker}
                       </Link>
                     </TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {market.title}
+                    <TableCell className="max-w-xs">
+                      <div className="truncate">{market.title}</div>
+                      {market.subtitle && (
+                        <div className="truncate text-xs text-muted-foreground">
+                          {market.subtitle}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {market.last_price != null
