@@ -4,13 +4,14 @@ import { formatCurrency, formatPercent, formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
+import { AlertToggle } from "@/components/ui/alert-toggle";
 
 export const dynamic = "force-dynamic";
 
 export default async function CircuitBreakersPage() {
   const supabase = createServerClient();
 
-  const [status, tripsRes] = await Promise.all([
+  const [status, tripsRes, alertSettingRes] = await Promise.all([
     getCircuitBreakerStatus(),
     supabase
       .from("strategy_learnings")
@@ -18,7 +19,14 @@ export default async function CircuitBreakersPage() {
       .eq("learning_type", "circuit_breaker")
       .order("created_at", { ascending: false })
       .limit(20),
+    supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "email_alerts_enabled")
+      .single(),
   ]);
+
+  const emailAlertsEnabled = alertSettingRes.data?.value === true;
 
   const trips = tripsRes.data ?? [];
 
@@ -101,6 +109,28 @@ export default async function CircuitBreakersPage() {
             {status.kill_switch_active
               ? "Kill switch is active. All trading is halted. Use CLI to deactivate: npx tsx src/scripts/kill-switch.ts off"
               : "Kill switch is off. Trading proceeds normally through other breaker checks."}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Email Alert Notifications */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <span className="font-medium">Email Alert Notifications</span>
+            <div className="flex items-center gap-3">
+              <Badge variant={emailAlertsEnabled ? "secondary" : "outline"}>
+                {emailAlertsEnabled ? "ON" : "OFF"}
+              </Badge>
+              <AlertToggle initialEnabled={emailAlertsEnabled} />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            {emailAlertsEnabled
+              ? "Email alerts are active. You will receive emails when opportunities are detected across all categories (crypto, weather, sports, economics, cross-market)."
+              : "Email alerts are paused. Opportunities are still detected and logged, but no emails will be sent. Toggle on when you want to receive notifications."}
           </p>
         </CardContent>
       </Card>

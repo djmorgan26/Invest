@@ -20,6 +20,8 @@ on:
     - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
     # Historical trade fetch — daily at 2am
     - cron: '0 2 * * *'
+    # Refresh market mappings (Polymarket↔Kalshi) — every 6 hours
+    - cron: '30 */6 * * *'
   workflow_dispatch:
     inputs:
       job:
@@ -37,6 +39,7 @@ on:
           - fetch-history
           - external-data
           - alert-check
+          - refresh-mappings
           - all
 
 jobs:
@@ -208,5 +211,21 @@ jobs:
           cat /tmp/response.txt
           if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
             echo "::error::HTTP $HTTP_CODE from /api/trades/fetch-history"
+            exit 1
+          fi
+
+  refresh-mappings:
+    if: github.event.schedule == '30 */6 * * *' || (github.event_name == 'workflow_dispatch' && (inputs.job == 'refresh-mappings' || inputs.job == 'all'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh Polymarket↔Kalshi market mappings
+        run: |
+          HTTP_CODE=$(curl -sS --max-time 55 -o /tmp/response.txt -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/mappings/refresh")
+          cat /tmp/response.txt
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "::error::HTTP $HTTP_CODE from /api/mappings/refresh"
             exit 1
           fi
