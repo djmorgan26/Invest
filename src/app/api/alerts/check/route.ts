@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { sendOpportunityAlert } from "@/lib/notifications";
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /**
  * Cron-triggered opportunity checker.
