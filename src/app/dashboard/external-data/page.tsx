@@ -88,7 +88,7 @@ export default async function ExternalDataPage() {
   // Kalshi stats from markets table (primary source, not in external_signals)
   const [kalshiCountRes, kalshiLatestRes] = await Promise.all([
     supabase.from("markets").select("*", { count: "exact", head: true }),
-    supabase.from("sync_log").select("completed_at").eq("operation", "market_sync").order("completed_at", { ascending: false }).limit(1),
+    supabase.from("sync_log").select("completed_at").eq("type", "market_sync").order("completed_at", { ascending: false }).limit(1),
   ]);
   const kalshiCount = kalshiCountRes.count ?? 0;
   const kalshiLatest = kalshiLatestRes.data?.[0]?.completed_at ?? null;

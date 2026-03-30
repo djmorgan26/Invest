@@ -39,91 +39,104 @@ function formatAgo(dateStr: string | null): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export function SourceStatusGrid({ sourceStats }: SourceStatusGridProps) {
+function SourceCard({ info, stats }: { info: SourceInfo; stats?: { count: number; latest: string | null; stale: boolean } }) {
+  const hasData = stats && stats.count > 0;
+  const isStale = stats?.stale ?? true;
+  const isOnline = hasData && !isStale;
+  const needsKey = info.auth === "api_key" && !hasData;
+  const isPrimary = info.source === "kalshi";
+
   return (
-    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-      {SOURCES.map((info) => {
-        const stats = sourceStats[info.source];
-        const hasData = stats && stats.count > 0;
-        const isStale = stats?.stale ?? true;
-        const isOnline = hasData && !isStale;
-        const needsKey = info.auth === "api_key" && !hasData;
-
-        return (
-          <a
-            key={info.source}
-            href={info.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(
-              "relative rounded-xl border bg-card p-4 transition-colors ring-1 hover:bg-secondary/50",
-              isOnline
-                ? "ring-success/30 border-success/20"
+    <a
+      href={info.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        "relative rounded-xl border bg-card p-4 transition-colors ring-1 hover:bg-secondary/50",
+        isOnline
+          ? "ring-success/30 border-success/20"
+          : needsKey
+            ? "ring-warning/20 border-warning/15"
+            : hasData && isStale
+              ? "ring-warning/30 border-warning/20"
+              : "ring-foreground/10 border-border"
+      )}
+    >
+      {/* Status dot */}
+      <div className="absolute top-3 right-3">
+        <span
+          className={cn(
+            "inline-block h-2.5 w-2.5 rounded-full",
+            isOnline
+              ? "bg-success animate-pulse"
+              : hasData && isStale
+                ? "bg-warning"
                 : needsKey
-                  ? "ring-warning/20 border-warning/15"
-                  : hasData && isStale
-                    ? "ring-warning/30 border-warning/20"
-                    : "ring-foreground/10 border-border"
-            )}
-          >
-            {/* Status dot */}
-            <div className="absolute top-3 right-3">
-              <span
-                className={cn(
-                  "inline-block h-2.5 w-2.5 rounded-full",
-                  isOnline
-                    ? "bg-success animate-pulse"
-                    : hasData && isStale
-                      ? "bg-warning"
-                      : needsKey
-                        ? "bg-warning/50"
-                        : "bg-muted-foreground/30"
-                )}
-              />
-            </div>
+                  ? "bg-warning/50"
+                  : "bg-muted-foreground/30"
+          )}
+        />
+      </div>
 
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">{info.icon}</span>
-              <div>
-                <p className="text-sm font-semibold">{info.name}</p>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  {info.category}
-                </p>
-              </div>
-            </div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-lg">{info.icon}</span>
+        <div>
+          <p className="text-sm font-semibold">{info.name}</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {info.category}
+          </p>
+        </div>
+      </div>
 
-            <p className="text-xs text-muted-foreground mb-3 line-clamp-1">
-              {info.description}
-            </p>
+      <p className="text-xs text-muted-foreground mb-3 line-clamp-1">
+        {info.description}
+      </p>
 
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                {hasData ? `${stats.count.toLocaleString()} ${info.source === "kalshi" ? "markets" : "signals"}` : needsKey ? "Needs API key" : "No data"}
-              </span>
-              <span
-                className={cn(
-                  "font-mono",
-                  isOnline
-                    ? "text-success"
-                    : isStale && hasData
-                      ? "text-warning"
-                      : "text-muted-foreground"
-                )}
-              >
-                {formatAgo(stats?.latest ?? null)}
-              </span>
-            </div>
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">
+          {hasData ? `${stats.count.toLocaleString()} ${isPrimary ? "markets" : "signals"}` : needsKey ? "Needs API key" : "No data"}
+        </span>
+        <span
+          className={cn(
+            "font-mono",
+            isOnline
+              ? "text-success"
+              : isStale && hasData
+                ? "text-warning"
+                : "text-muted-foreground"
+          )}
+        >
+          {isPrimary && hasData && !stats.latest ? "Synced" : formatAgo(stats?.latest ?? null)}
+        </span>
+      </div>
 
-            {info.auth === "api_key" && (
-              <div className="mt-2">
-                <span className="inline-flex items-center rounded-md bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
-                  API Key
-                </span>
-              </div>
-            )}
-          </a>
-        );
-      })}
+      {info.auth === "api_key" && (
+        <div className="mt-2">
+          <span className="inline-flex items-center rounded-md bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+            API Key
+          </span>
+        </div>
+      )}
+    </a>
+  );
+}
+
+export function SourceStatusGrid({ sourceStats }: SourceStatusGridProps) {
+  const kalshi = SOURCES.find((s) => s.source === "kalshi")!;
+  const external = SOURCES.filter((s) => s.source !== "kalshi");
+
+  return (
+    <div className="space-y-4">
+      {/* Primary exchange — full width */}
+      <SourceCard info={kalshi} stats={sourceStats[kalshi.source]} />
+
+      {/* External data sources */}
+      <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">External Sources</p>
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        {external.map((info) => (
+          <SourceCard key={info.source} info={info} stats={sourceStats[info.source]} />
+        ))}
+      </div>
     </div>
   );
 }
