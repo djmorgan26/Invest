@@ -85,6 +85,16 @@ export default async function ExternalDataPage() {
     sourceStats[s.source] = { count: s.count, latest: s.latest, stale: s.stale };
   }
 
+  // Kalshi stats from markets table (primary source, not in external_signals)
+  const [kalshiCountRes, kalshiLatestRes] = await Promise.all([
+    supabase.from("markets").select("*", { count: "exact", head: true }),
+    supabase.from("sync_log").select("completed_at").eq("operation", "market_sync").order("completed_at", { ascending: false }).limit(1),
+  ]);
+  const kalshiCount = kalshiCountRes.count ?? 0;
+  const kalshiLatest = kalshiLatestRes.data?.[0]?.completed_at ?? null;
+  const kalshiStale = !kalshiLatest || (Date.now() - new Date(kalshiLatest).getTime()) > 12 * 60 * 60 * 1000; // 12h — syncs every 6h
+  sourceStats["kalshi"] = { count: kalshiCount, latest: kalshiLatest, stale: kalshiStale };
+
   // Category breakdown
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const catData: any[] = categoryRes.data ?? [];
@@ -111,7 +121,7 @@ export default async function ExternalDataPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">External Data Control Center</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Live signals from 8 data sources powering cross-market intelligence
+          Live signals from 9 data sources powering cross-market intelligence
         </p>
       </div>
 
@@ -120,7 +130,7 @@ export default async function ExternalDataPage() {
         <div className="rounded-lg bg-secondary/50 px-4 py-2">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Sources Online</p>
           <p className={`font-mono text-sm font-semibold ${activeSources >= 6 ? "text-success" : activeSources >= 3 ? "text-warning" : "text-destructive"}`}>
-            {activeSources} / {EXPECTED_SOURCES.length}
+            {activeSources} / {EXPECTED_SOURCES.length + 1}
           </p>
         </div>
         <div className="rounded-lg bg-secondary/50 px-4 py-2">

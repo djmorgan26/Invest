@@ -9,17 +9,19 @@ interface SourceInfo {
   category: string;
   auth: "free" | "api_key";
   description: string;
+  url: string;
 }
 
 const SOURCES: SourceInfo[] = [
-  { name: "Polymarket", source: "polymarket", icon: "🔮", category: "Prediction Markets", auth: "free", description: "Prediction market prices & volumes" },
-  { name: "PredictIt", source: "predictit", icon: "🏛️", category: "Prediction Markets", auth: "free", description: "Political contract prices" },
-  { name: "ESPN", source: "espn", icon: "🏈", category: "Sports", auth: "free", description: "Live scores, odds for NFL/NBA/MLB/NHL/MLS" },
-  { name: "The Odds API", source: "odds_api", icon: "🎰", category: "Sports", auth: "api_key", description: "Consensus odds from 40+ sportsbooks" },
-  { name: "FRED", source: "fred", icon: "📊", category: "Economics", auth: "api_key", description: "15 key economic series (CPI, GDP, rates)" },
-  { name: "CoinGecko", source: "coingecko", icon: "🦎", category: "Crypto", auth: "free", description: "Top 10 crypto prices, Fear & Greed" },
-  { name: "Open-Meteo", source: "open_meteo", icon: "🌤️", category: "Weather", auth: "free", description: "7-day forecasts for 10 US cities" },
-  { name: "NWS", source: "nws", icon: "🇺🇸", category: "Weather", auth: "free", description: "Official NOAA forecasts (settlement source)" },
+  { name: "Kalshi", source: "kalshi", icon: "📈", category: "Primary Exchange", auth: "api_key", description: "43K+ markets, prices, orderbooks, settlements", url: "https://kalshi.com" },
+  { name: "Polymarket", source: "polymarket", icon: "🔮", category: "Prediction Markets", auth: "free", description: "Prediction market prices & volumes", url: "https://polymarket.com" },
+  { name: "PredictIt", source: "predictit", icon: "🏛️", category: "Prediction Markets", auth: "free", description: "Political contract prices", url: "https://www.predictit.org" },
+  { name: "ESPN", source: "espn", icon: "🏈", category: "Sports", auth: "free", description: "Live scores, odds for NFL/NBA/MLB/NHL/MLS", url: "https://www.espn.com" },
+  { name: "The Odds API", source: "odds_api", icon: "🎰", category: "Sports", auth: "api_key", description: "Consensus odds from 40+ sportsbooks", url: "https://the-odds-api.com" },
+  { name: "FRED", source: "fred", icon: "📊", category: "Economics", auth: "api_key", description: "15 key economic series (CPI, GDP, rates)", url: "https://fred.stlouisfed.org" },
+  { name: "CoinGecko", source: "coingecko", icon: "🦎", category: "Crypto", auth: "free", description: "Top 10 crypto prices, Fear & Greed", url: "https://www.coingecko.com" },
+  { name: "Open-Meteo", source: "open_meteo", icon: "🌤️", category: "Weather", auth: "free", description: "7-day forecasts for 10 US cities", url: "https://open-meteo.com" },
+  { name: "NWS", source: "nws", icon: "🇺🇸", category: "Weather", auth: "free", description: "Official NOAA forecasts (settlement source)", url: "https://www.weather.gov" },
 ];
 
 interface SourceStatusGridProps {
@@ -48,10 +50,13 @@ export function SourceStatusGrid({ sourceStats }: SourceStatusGridProps) {
         const needsKey = info.auth === "api_key" && !hasData;
 
         return (
-          <div
+          <a
             key={info.source}
+            href={info.url}
+            target="_blank"
+            rel="noopener noreferrer"
             className={cn(
-              "relative rounded-xl border bg-card p-4 transition-colors ring-1",
+              "relative rounded-xl border bg-card p-4 transition-colors ring-1 hover:bg-secondary/50",
               isOnline
                 ? "ring-success/30 border-success/20"
                 : needsKey
@@ -93,7 +98,7 @@ export function SourceStatusGrid({ sourceStats }: SourceStatusGridProps) {
 
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">
-                {hasData ? `${stats.count} signals` : needsKey ? "Needs API key" : "No data"}
+                {hasData ? `${stats.count.toLocaleString()} ${info.source === "kalshi" ? "markets" : "signals"}` : needsKey ? "Needs API key" : "No data"}
               </span>
               <span
                 className={cn(
@@ -116,7 +121,7 @@ export function SourceStatusGrid({ sourceStats }: SourceStatusGridProps) {
                 </span>
               </div>
             )}
-          </div>
+          </a>
         );
       })}
     </div>
