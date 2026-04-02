@@ -1,0 +1,15 @@
+# Python virtual environment
+.venv/
+
+# Training data (large CSVs, regenerate from Supabase)
+data/settled_markets.csv
+data/market_trades.csv
+data/market_candles.csv
+data/features.csv
+
+# Model artifacts (regenerate by running train_v2.py)
+models/
+
+# Python cache
+__pycache__/
+*.pyc

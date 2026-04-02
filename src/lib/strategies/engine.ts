@@ -18,6 +18,7 @@ import { favoriteLongshot } from "./favorite-longshot";
 import { expiryConvergence } from "./expiry-convergence";
 import { newListing } from "./new-listing";
 import { liquidityProvision } from "./liquidity-provision";
+import { mlStrategy } from "./ml-strategy";
 import { estimateSlippageYes, estimateSlippageNo } from "./slippage";
 import type { DepthLevel } from "./slippage";
 import { checkCircuitBreakers } from "./circuit-breakers";
@@ -33,6 +34,7 @@ const ALL_STRATEGIES: Strategy[] = [
   expiryConvergence,
   newListing,
   liquidityProvision,
+  mlStrategy,
 ];
 
 const STARTING_BALANCE = 10000;
