@@ -68,18 +68,20 @@ Use these for structured analysis sessions:
 
 The system runs autonomously via GitHub Actions cron jobs (`.github/workflows/crons.yml`):
 
-| Job | Frequency | What it does |
-|-----|-----------|--------------|
-| Market sync | Every 6h | Sync all active markets from Kalshi API |
-| Price snapshots | Every 5 min | Track prices for watchlisted + top 200 volume markets |
-| **Strategy scan** | Every 5 min | Run all enabled strategies, auto-trade opportunities |
-| Trade resolution | Every 30 min | Check settlements, close trades, calculate P&L |
-| **Portfolio snapshot** | Every 1h | Compute and store portfolio value |
-| **Strategy tuning** | Weekly (Sun) | Auto-adjust strategy parameters based on results |
-| **Orderbook snapshot** | Every 5 min | Capture order book depth for watchlisted tickers |
-| **Trade history fetch** | Daily (2am) | Fetch trade history for settled markets for backtesting |
-| **External data fetch** | Every 15 min | Fetch signals from Polymarket, ESPN, CoinGecko, weather, economics APIs |
-| **Alert check** | Every 5 min | Detect stale Kalshi prices vs external data, send email alerts |
+| Job | Frequency (paper) | Frequency (live) | What it does |
+|-----|-------------------|------------------|--------------|
+| Market sync | Every 12h | Every 6h | Sync all active markets from Kalshi API |
+| Price snapshots | Every 15 min | Every 5 min | Track prices for watchlisted + top 200 volume markets |
+| **Strategy scan** | Every 15 min | Every 5 min | Run all 11 enabled strategies (incl. ML), auto-trade |
+| Trade resolution | Every 1h | Every 30 min | Check settlements, close trades, calculate P&L |
+| **Portfolio snapshot** | Every 2h | Every 1h | Compute and store portfolio value |
+| **Strategy tuning** | Weekly (Sun) | Weekly (Sun) | Auto-adjust strategy parameters based on results |
+| **Orderbook snapshot** | Every 15 min | Every 5 min | Capture order book depth for watchlisted tickers |
+| **Trade history fetch** | Daily (2am) | Daily (2am) | Fetch trade history for settled markets for backtesting |
+| **External data fetch** | Every 30 min | Every 15 min | Fetch signals from Polymarket, ESPN, CoinGecko, weather, economics APIs |
+| **Alert check** | Every 15 min | Every 5 min | Detect stale Kalshi prices vs external data, send email alerts |
+
+**Note:** Currently running in paper-trading mode with slower intervals to reduce GitHub Actions usage. See go-live checklist in memory for restoration instructions.
 
 ## External Data Sources
 
@@ -170,6 +172,7 @@ Ten autonomous strategies scan for opportunities:
 | **Expiry Convergence** | Snipe markets <48h from close still priced 25-75¢ with momentum | `max_hours_to_close`, `min_momentum` |
 | **New Listing Edge** | Trade newly listed markets (<24h) with naive pricing | `max_hours_since_listing`, `min_spread` |
 | **Liquidity Provision** | Capture spread in stable wide-spread markets using orderbook depth | `min_spread`, `max_price_volatility`, `min_depth_ratio` |
+| **ML Model** | XGBoost/LightGBM/NN ensemble predicts P(YES), trades when ML prob diverges 8%+ from market price | `min_edge`, `min_trades`, `max_markets` |
 
 ### Strategy Engine Rules
 - **Minimum edge:** $0.05 (fair value vs. market price)

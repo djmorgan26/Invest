@@ -66,6 +66,20 @@ interface Strategy {
 ```
 You can read and modify any strategy file directly.
 
+### ML Model Training Pipeline
+The `ml/` directory contains a Python ML pipeline that trains XGBoost, LightGBM, and Neural Net models on historical trade data.
+
+| Tool | Command | What It Does |
+|------|---------|-------------|
+| **Extract training data** | `npx tsx src/scripts/extract-ml-data.ts` | Pulls settled markets + trades + candles from Supabase → CSVs in `ml/data/` |
+| **Compute features** | `cd ml && source .venv/bin/activate && python extract_features.py` | Builds 52-feature vectors at 8 observation points per market → `features.parquet` |
+| **Train models** | `cd ml && source .venv/bin/activate && python train_v2.py` | XGBoost + LightGBM + NN with Optuna HPO, GroupKFold CV → models in `ml/models/` |
+| **Check previous results** | Read `ml/models/training_metadata.json` | Previous model AUC, feature importance, training date |
+
+**When to retrain:** When new settled markets are available (check `market_trades` distinct ticker count vs previous training). The ml-model strategy (`src/lib/strategies/ml-strategy.ts`) uses a heuristic approximation of the trained model. Retraining improves the heuristic weights.
+
+**Key features (ranked by importance):** price_prob, last_trade_price, price_in_range, momentum_6h, candle_sentiment, ATR, taker_imbalance, RSI, VPIN
+
 ### Key Config Parameters Per Strategy
 See `references/strategy-params.md` for the full parameter reference.
 
@@ -345,6 +359,11 @@ INSERT INTO strategy_learnings (strategy_id, learning_type, description, data) V
 | `src/lib/streaming/stale-detector.ts` | Live speed edge detection engine |
 | `src/lib/intelligence/context.ts` | Market context with external signal enrichment |
 | `docs/kalshi-mechanics.md` | Kalshi fee structure and market mechanics |
+| `src/lib/strategies/ml-strategy.ts` | ML model strategy (11th strategy, uses trained model) |
+| `src/lib/strategies/ml-scorer.ts` | ML feature computation + scoring in TypeScript |
+| `ml/train_v2.py` | ML training pipeline (XGBoost + LightGBM + NN) |
+| `ml/extract_features.py` | Feature extraction from CSVs to parquet |
+| `ml/models/training_metadata.json` | Latest training results + feature importances |
 | `CLAUDE.md` | Full project architecture |
 
 ## Important Constraints
