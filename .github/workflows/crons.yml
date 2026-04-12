@@ -1,43 +1,46 @@
 name: Strategy Engine Crons
 
 on:
-  schedule:
-    # IMPORTANT: Each cron must have UNIQUE trigger minutes to avoid GitHub Actions
-    # schedule collision. When multiple crons fire at the same minute, GitHub picks
-    # one and skips the rest. Every schedule below uses distinct minute offsets.
-    #
-    # *** PAPER-TRADING MODE: Intervals slowed to reduce GitHub Actions usage ***
-    # *** When going live with real money, restore the fast intervals below: ***
-    #   Price snapshots:   */5 * * * *         (every 5m)
-    #   Strategy scan:     1,6,11,...,56 * * * *  (every 5m)
-    #   Alert check:       2,7,12,...,57 * * * *  (every 5m)
-    #   External data:     3,18,33,48 * * * *     (every 15m)
-    #   Trade resolution:  4,34 * * * *           (every 30m)
-    #   Portfolio:         8 * * * *              (every 1h)
-    #   Market sync:       9 */6 * * *           (every 6h)
-    #   Orderbook:         */5 * * * *           (every 5m)
-    #   Refresh mappings:  38 */6 * * *          (every 6h)
-    #
-    # Price snapshots — every 15 minutes (:00,:15,:30,:45)
-    - cron: '0,15,30,45 * * * *'
-    # Strategy scan + auto-trade — every 15 minutes (:01,:16,:31,:46)
-    - cron: '1,16,31,46 * * * *'
-    # Alert check — every 15 minutes (:02,:17,:32,:47)
-    - cron: '2,17,32,47 * * * *'
-    # External data fetch — every 30 minutes (:03,:33)
-    - cron: '3,33 * * * *'
-    # Trade resolution — every hour (:04)
-    - cron: '4 * * * *'
-    # Portfolio snapshot — every 2 hours (:08)
-    - cron: '8 */2 * * *'
-    # Market sync — every 12 hours (:09)
-    - cron: '9 */12 * * *'
-    # Strategy tuning — weekly Sunday midnight (:13)
-    - cron: '13 0 * * 0'
-    # Historical trade fetch — daily at 2:14am
-    - cron: '14 2 * * *'
-    # Refresh market mappings — every 12 hours (:38)
-    - cron: '38 */12 * * *'
+  # schedule: DISABLED — GitHub Actions minutes exhausted.
+  # To re-enable, uncomment the schedule block below and remove this comment.
+  #
+  # schedule:
+  #   # IMPORTANT: Each cron must have UNIQUE trigger minutes to avoid GitHub Actions
+  #   # schedule collision. When multiple crons fire at the same minute, GitHub picks
+  #   # one and skips the rest. Every schedule below uses distinct minute offsets.
+  #   #
+  #   # *** PAPER-TRADING MODE: Intervals slowed to reduce GitHub Actions usage ***
+  #   # *** When going live with real money, restore the fast intervals below: ***
+  #   #   Price snapshots:   */5 * * * *         (every 5m)
+  #   #   Strategy scan:     1,6,11,...,56 * * * *  (every 5m)
+  #   #   Alert check:       2,7,12,...,57 * * * *  (every 5m)
+  #   #   External data:     3,18,33,48 * * * *     (every 15m)
+  #   #   Trade resolution:  4,34 * * * *           (every 30m)
+  #   #   Portfolio:         8 * * * *              (every 1h)
+  #   #   Market sync:       9 */6 * * *           (every 6h)
+  #   #   Orderbook:         */5 * * * *           (every 5m)
+  #   #   Refresh mappings:  38 */6 * * *          (every 6h)
+  #   #
+  #   # Price snapshots — every 15 minutes (:00,:15,:30,:45)
+  #   - cron: '0,15,30,45 * * * *'
+  #   # Strategy scan + auto-trade — every 15 minutes (:01,:16,:31,:46)
+  #   - cron: '1,16,31,46 * * * *'
+  #   # Alert check — every 15 minutes (:02,:17,:32,:47)
+  #   - cron: '2,17,32,47 * * * *'
+  #   # External data fetch — every 30 minutes (:03,:33)
+  #   - cron: '3,33 * * * *'
+  #   # Trade resolution — every hour (:04)
+  #   - cron: '4 * * * *'
+  #   # Portfolio snapshot — every 2 hours (:08)
+  #   - cron: '8 */2 * * *'
+  #   # Market sync — every 12 hours (:09)
+  #   - cron: '9 */12 * * *'
+  #   # Strategy tuning — weekly Sunday midnight (:13)
+  #   - cron: '13 0 * * 0'
+  #   # Historical trade fetch — daily at 2:14am
+  #   - cron: '14 2 * * *'
+  #   # Refresh market mappings — every 12 hours (:38)
+  #   - cron: '38 */12 * * *'
   workflow_dispatch:
     inputs:
       job:
