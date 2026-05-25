@@ -48,7 +48,7 @@ export async function scanAll(): Promise<{
   strategiesSkipped: string[];
   perStrategy: Record<string, number>;
 }> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   // Load enabled strategies from DB
   const { data: dbStrategies } = await supabase
@@ -157,7 +157,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
   skipped: number;
   details: Array<{ ticker: string; strategy_id: string; side: string; edge: number; action: string }>;
 }> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   let tradesPlaced = 0;
   let predictionsWritten = 0;
   let skipped = 0;
@@ -404,7 +404,7 @@ export async function autoTrade(opportunities: Opportunity[]): Promise<{
 }
 
 async function checkPerformanceDecay(
-  supabase: ReturnType<typeof createServerClient>,
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
   strategyId: string
 ): Promise<boolean> {
   const { data: recentTrades } = await supabase
@@ -423,7 +423,7 @@ async function checkPerformanceDecay(
 }
 
 export async function getPerformance(strategyId?: string): Promise<StrategyPerformance[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   // Get all strategies
   const { data: strategies } = await supabase

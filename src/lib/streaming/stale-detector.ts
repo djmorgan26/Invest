@@ -46,7 +46,7 @@ export function recordKalshiUpdate(ticker: string, price: number): void {
  * Check for stale opportunities after a score change
  */
 export async function checkScoreChange(score: LiveScore): Promise<StaleOpportunity[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const opportunities: StaleOpportunity[] = [];
 
   // Find Kalshi markets related to this game
@@ -147,7 +147,7 @@ export async function checkCryptoMove(
   price: LiveCryptoPrice,
   recentPrices: { price: number; timestamp: number }[]
 ): Promise<StaleOpportunity[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const opportunities: StaleOpportunity[] = [];
 
   // Calculate recent price movement

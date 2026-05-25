@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const now = new Date().toISOString();
   const alerts: { ticker: string; edge: number; side: string; category: string }[] = [];
 

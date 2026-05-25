@@ -63,7 +63,7 @@ function StatusBadge({ status }: { status: string }) {
 // ── Page ─────────────────────────────────────────────────────────────
 
 export default async function PredictionsPage() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   // 1. Fetch all predictions
   const { data: allPredictions } = await supabase

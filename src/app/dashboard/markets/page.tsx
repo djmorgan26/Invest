@@ -4,7 +4,7 @@ import { MarketTable } from "@/components/markets/market-table";
 export const dynamic = "force-dynamic";
 
 export default async function MarketsPage() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const { data: markets } = await supabase
     .from("markets")

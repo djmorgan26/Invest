@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
 
     // Fetch resolved predictions matching the selected strategy IDs
     const { data: predictions, error: predError } = await supabase

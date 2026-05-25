@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     const startedAt = new Date().toISOString();
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
 
     // Check for a cursor from previous partial sync
     const url = new URL(request.url);
@@ -165,7 +165,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     try {
-      const supabase = createServerClient();
+      const supabase = await createServerClient();
       await supabase.from("sync_log").insert({
         type: "market_sync",
         status: "error",

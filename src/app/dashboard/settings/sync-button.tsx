@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isDemoModeClient } from "@/lib/demo/client";
 
 export function SyncButton() {
   const [loading, setLoading] = useState(false);
@@ -10,6 +11,14 @@ export function SyncButton() {
   } | null>(null);
 
   async function handleSync() {
+    // Demo mode is read-only: simulate a successful sync without calling the API.
+    if (isDemoModeClient()) {
+      setResult({
+        success: true,
+        message: "Demo mode — sync is simulated. No live data was fetched.",
+      });
+      return;
+    }
     setLoading(true);
     setResult(null);
 

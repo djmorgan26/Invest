@@ -1,12 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import { isDemoModeClient } from "@/lib/demo/client";
 
 export function AlertToggle({ initialEnabled }: { initialEnabled: boolean }) {
   const [enabled, setEnabled] = useState(initialEnabled);
   const [loading, setLoading] = useState(false);
 
   async function toggle() {
+    // Demo mode is read-only: flip the UI locally without hitting the API.
+    if (isDemoModeClient()) {
+      setEnabled((v) => !v);
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/settings", {

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
 
     // Get watchlisted tickers (most relevant markets)
     const { data: watchlist, error: watchlistError } = await supabase

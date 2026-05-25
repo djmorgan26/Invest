@@ -9,7 +9,7 @@ import { AlertToggle } from "@/components/ui/alert-toggle";
 export const dynamic = "force-dynamic";
 
 export default async function CircuitBreakersPage() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const [status, tripsRes, alertSettingRes] = await Promise.all([
     getCircuitBreakerStatus(),

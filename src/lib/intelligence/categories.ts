@@ -13,7 +13,7 @@ export interface CategoryPerformance {
 }
 
 export async function getCategoryPerformance(): Promise<CategoryPerformance[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   // Get closed trades joined with markets and events for category
   const { data: trades } = await supabase

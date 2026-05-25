@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     const completedAt = new Date().toISOString();
 
     // Log to sync_log
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
     await supabase.from("sync_log").insert({
       type: "strategy_scan",
       status: "success",
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     try {
-      const supabase = createServerClient();
+      const supabase = await createServerClient();
       await supabase.from("sync_log").insert({
         type: "strategy_scan",
         status: "error",

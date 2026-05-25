@@ -12,6 +12,8 @@ import {
 } from "recharts";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { BacktestResult } from "@/lib/strategies/backtester";
+import { isDemoModeClient } from "@/lib/demo/client";
+import { buildDemoBacktest } from "@/lib/demo/fixtures";
 
 interface BacktesterProps {
   strategies: { id: string; name: string }[];
@@ -48,6 +50,13 @@ export function Backtester({ strategies }: BacktesterProps) {
     setLoading(true);
     setError(null);
     setResult(null);
+
+    // Demo mode: serve a simulated backtest result client-side (no API call).
+    if (isDemoModeClient()) {
+      setResult(buildDemoBacktest(budget));
+      setLoading(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/backtest", {

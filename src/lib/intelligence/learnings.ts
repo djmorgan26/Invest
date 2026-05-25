@@ -14,7 +14,7 @@ export async function recordLearning(params: {
   description: string;
   data?: Record<string, unknown>;
 }): Promise<void> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const { error } = await supabase
     .from("strategy_learnings")
@@ -43,7 +43,7 @@ export async function getRecentLearnings(options?: {
   data: Record<string, unknown>;
   created_at: string;
 }[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const limit = options?.limit ?? 50;
 
   let query = supabase

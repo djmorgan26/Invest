@@ -10,7 +10,7 @@ export async function fetchAndStoreAllSignals(opts?: {
   freeOnly?: boolean;
   sources?: string[];
 }): Promise<{ total: number; bySource: Record<string, number>; errors: string[] }> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const connectors = opts?.freeOnly ? FREE_CONNECTORS : ALL_CONNECTORS;
   const filtered = opts?.sources
     ? connectors.filter((c) => opts.sources!.includes(c.source))
@@ -87,7 +87,7 @@ export async function getSignalsForMarket(opts: {
   sources?: string[];
   limit?: number;
 }): Promise<ExternalSignal[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   let query = supabase
     .from("external_signals")
     .select("*")
@@ -142,7 +142,7 @@ export async function findCrossMarketDivergences(opts?: {
   divergence_cents: number;
   external_title: string;
 }[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const minDiv = opts?.minDivergenceCents ?? 5;
 
   // Get mappings

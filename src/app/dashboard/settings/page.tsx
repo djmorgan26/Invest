@@ -7,7 +7,7 @@ import { SyncButton } from "./sync-button";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const [syncLogRes, portfolioRes] = await Promise.all([
     supabase

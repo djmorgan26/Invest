@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const changed = results.filter((r) => r.changed);
 
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
     await supabase.from("sync_log").insert({
       type: "strategy_tune",
       status: "success",
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const message = error instanceof Error ? error.message : "Unknown error";
     // Log error to sync_log for operational visibility
     try {
-      const supabase = createServerClient();
+      const supabase = await createServerClient();
       await supabase.from("sync_log").insert({
         type: "strategy_tune",
         status: "error",

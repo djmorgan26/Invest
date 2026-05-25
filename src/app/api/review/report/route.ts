@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
     const report: Record<string, unknown> = {};
 
     // 1. Portfolio state

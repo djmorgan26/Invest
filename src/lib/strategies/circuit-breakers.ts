@@ -38,7 +38,7 @@ export async function checkCircuitBreakers(
   ticker: string,
   strategyId: string,
 ): Promise<CircuitBreakerResult> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   // 1. Kill switch — immediate halt
   const killSwitchActive = await isKillSwitchActive(supabase);
@@ -96,7 +96,7 @@ export async function checkCircuitBreakers(
  * Get full circuit breaker status for dashboard/CLI display.
  */
 export async function getCircuitBreakerStatus(): Promise<CircuitBreakerStatus> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const killSwitchActive = await isKillSwitchActive(supabase);
   const dailyPnl = await getDailyPnl(supabase);
@@ -127,7 +127,7 @@ export async function getCircuitBreakerStatus(): Promise<CircuitBreakerStatus> {
 
 // --- Kill Switch ---
 
-async function isKillSwitchActive(supabase: ReturnType<typeof createServerClient>): Promise<boolean> {
+async function isKillSwitchActive(supabase: Awaited<ReturnType<typeof createServerClient>>): Promise<boolean> {
   const { data } = await supabase
     .from("strategy_learnings")
     .select("id")
@@ -143,7 +143,7 @@ async function isKillSwitchActive(supabase: ReturnType<typeof createServerClient
  * Persists to DB so it survives restarts.
  */
 export async function activateKillSwitch(reason: string): Promise<void> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   // Remove any existing kill switch entries first
   await supabase
@@ -163,7 +163,7 @@ export async function activateKillSwitch(reason: string): Promise<void> {
  * Deactivate the kill switch — resume trading.
  */
 export async function deactivateKillSwitch(): Promise<void> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   await supabase
     .from("strategy_learnings")
     .delete()
@@ -172,7 +172,7 @@ export async function deactivateKillSwitch(): Promise<void> {
 
 // --- Daily P&L ---
 
-async function getDailyPnl(supabase: ReturnType<typeof createServerClient>): Promise<number> {
+async function getDailyPnl(supabase: Awaited<ReturnType<typeof createServerClient>>): Promise<number> {
   const todayStart = new Date();
   todayStart.setUTCHours(0, 0, 0, 0);
 
@@ -213,7 +213,7 @@ async function getDailyPnl(supabase: ReturnType<typeof createServerClient>): Pro
 
 // --- Drawdown ---
 
-async function getDrawdown(supabase: ReturnType<typeof createServerClient>): Promise<{
+async function getDrawdown(supabase: Awaited<ReturnType<typeof createServerClient>>): Promise<{
   drawdownPct: number;
   peakValue: number;
   currentValue: number;
@@ -239,7 +239,7 @@ async function getDrawdown(supabase: ReturnType<typeof createServerClient>): Pro
 // --- Category Concentration ---
 
 async function getOpenTradesInCategory(
-  supabase: ReturnType<typeof createServerClient>,
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
   category: string,
 ): Promise<number> {
   // Get all open trade tickers
@@ -277,7 +277,7 @@ async function getOpenTradesInCategory(
   return openTrades.filter((t) => marketTickersInCategory.has(t.ticker)).length;
 }
 
-async function getAllCategoryCounts(supabase: ReturnType<typeof createServerClient>): Promise<Record<string, number>> {
+async function getAllCategoryCounts(supabase: Awaited<ReturnType<typeof createServerClient>>): Promise<Record<string, number>> {
   const { data: openTrades } = await supabase
     .from("paper_trades")
     .select("ticker")
@@ -315,7 +315,7 @@ async function getAllCategoryCounts(supabase: ReturnType<typeof createServerClie
 // --- Consecutive Losses ---
 
 async function getConsecutiveLosses(
-  supabase: ReturnType<typeof createServerClient>,
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
   strategyId: string,
 ): Promise<number> {
   const { data: recentTrades } = await supabase
@@ -340,7 +340,7 @@ async function getConsecutiveLosses(
   return consecutive;
 }
 
-async function getAllConsecutiveLosses(supabase: ReturnType<typeof createServerClient>): Promise<Record<string, number>> {
+async function getAllConsecutiveLosses(supabase: Awaited<ReturnType<typeof createServerClient>>): Promise<Record<string, number>> {
   const { data: strategies } = await supabase
     .from("strategies")
     .select("id")
@@ -358,7 +358,7 @@ async function getAllConsecutiveLosses(supabase: ReturnType<typeof createServerC
 // --- Logging ---
 
 async function logBreakerTrip(
-  supabase: ReturnType<typeof createServerClient>,
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
   breakerType: string,
   description: string,
 ): Promise<void> {

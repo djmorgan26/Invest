@@ -9,7 +9,7 @@ import { wilsonScoreInterval } from "@/lib/stats/wilson";
 export const dynamic = "force-dynamic";
 
 export default async function PnlPage() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   // Fetch all data in parallel
   const [tradesRes, openTradesRes, portfolioRes, strategiesRes] = await Promise.all([

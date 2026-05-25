@@ -12,7 +12,7 @@ interface TuneResult {
 }
 
 export async function tuneStrategy(strategyId: string): Promise<TuneResult> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   // Get current strategy config
   const { data: strategy } = await supabase
@@ -193,7 +193,7 @@ export async function tuneStrategy(strategyId: string): Promise<TuneResult> {
 }
 
 export async function tuneAll(): Promise<TuneResult[]> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const { data: strategies } = await supabase
     .from("strategies")
     .select("id");

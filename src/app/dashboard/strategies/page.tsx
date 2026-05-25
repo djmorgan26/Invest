@@ -10,7 +10,7 @@ import { wilsonScoreInterval } from "@/lib/stats/wilson";
 export const dynamic = "force-dynamic";
 
 export default async function StrategiesPage() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const [strategiesRes, tradesRes, learningsRes] = await Promise.all([
     supabase.from("strategies").select("*").order("created_at"),

@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const key = searchParams.get("key");
   if (!key) return NextResponse.json({ error: "Missing key" }, { status: 400 });
 
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const { data } = await supabase
     .from("app_settings")
     .select("value")
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
   if (!key) return NextResponse.json({ error: "Missing key" }, { status: 400 });
 
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const { error } = await supabase
     .from("app_settings")
     .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });

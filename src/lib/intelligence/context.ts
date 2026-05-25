@@ -66,7 +66,7 @@ interface RecentPrediction {
 }
 
 export async function getMarketContext(ticker: string): Promise<MarketContext | null> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   // Get market + event data
   const { data: market } = await supabase

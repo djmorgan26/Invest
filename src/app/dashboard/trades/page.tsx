@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 // ── Page ─────────────────────────────────────────────────────────────
 
 export default async function TradesPage() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   // 1. Fetch all trades
   const { data: allTrades } = await supabase

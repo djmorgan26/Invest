@@ -4,7 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const now = new Date().toISOString();
 
   const [

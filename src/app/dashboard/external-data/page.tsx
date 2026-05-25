@@ -13,7 +13,7 @@ const EXPECTED_SOURCES = [
 ];
 
 export default async function ExternalDataPage() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   // Fetch recent signals per source so every category is represented in the feed
   const signalFields = "source, signal_type, category, title, implied_probability, data, fetched_at, expires_at";
   const perSourceLimit = 15;

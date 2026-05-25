@@ -23,7 +23,7 @@ export interface Strategy {
 }
 
 export interface ScanContext {
-  supabase: ReturnType<typeof import("@/lib/supabase/server").createServerClient>;
+  supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createServerClient>>;
 }
 
 export interface StrategyConfig {

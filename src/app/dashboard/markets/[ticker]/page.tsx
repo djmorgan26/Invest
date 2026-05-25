@@ -13,7 +13,7 @@ export default async function MarketDetailPage({
   params: Promise<{ ticker: string }>;
 }) {
   const { ticker } = await params;
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const [marketRes, predictionsRes, snapshotsRes, tradesRes] =
     await Promise.all([

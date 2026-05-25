@@ -163,7 +163,7 @@ export async function refreshMarketMappings(): Promise<{
   updated: number;
   total_checked: number;
 }> {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const now = new Date().toISOString();
   let created = 0;
   let updated = 0;

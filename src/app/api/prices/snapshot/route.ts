@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
 
     // --- Part 1: Watchlist tickers (live Kalshi API calls) ---
     const { data: watchlist, error: watchlistError } = await supabase

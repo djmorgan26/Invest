@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
 
     // Get all closed trades with dates
     const { data: trades, error: tradesError } = await supabase

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
     const maxMarkets = 50; // conservative per run
 
     // Find settled markets that need trade history

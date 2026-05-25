@@ -15,7 +15,7 @@ interface Review {
 }
 
 export default async function ReviewsPage() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const { data: reviews } = await supabase
     .from("reviews")

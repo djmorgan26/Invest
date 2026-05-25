@@ -1,14 +1,19 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileTabs } from "@/components/layout/mobile-tabs";
 import { PageTransition } from "@/components/layout/page-transition";
+import { DemoBanner } from "@/components/demo/demo-banner";
+import { isDemoMode } from "@/lib/demo/config";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const demo = await isDemoMode();
+
   return (
     <div className="min-h-screen bg-background">
+      {demo && <DemoBanner />}
       <Sidebar />
       <MobileTabs />
       <main className="md:ml-16 pb-20 md:pb-0">

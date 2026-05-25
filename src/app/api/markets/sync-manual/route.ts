@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     }
 
     const startedAt = new Date().toISOString();
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
 
     // Fetch all active markets from Kalshi
     const markets = await getAllActiveMarkets();
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
 
     // Attempt to log the error
     try {
-      const supabase = createServerClient();
+      const supabase = await createServerClient();
       await supabase.from("sync_log").insert({
         type: "market_sync",
         status: "error",
