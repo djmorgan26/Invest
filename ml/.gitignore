@@ -6,6 +6,8 @@ data/settled_markets.csv
 data/market_trades.csv
 data/market_candles.csv
 data/features.csv
+data/features.parquet
+*.parquet
 
 # Model artifacts (regenerate by running train_v2.py)
 models/

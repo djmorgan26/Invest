@@ -188,4 +188,4 @@ npx tsx src/scripts/kill-switch.ts on "reason"     # Emergency stop
 
 ## License
 
-Private — not for redistribution.
+Personal project — source shared publicly for portfolio and review. Not licensed for redistribution or commercial use.
