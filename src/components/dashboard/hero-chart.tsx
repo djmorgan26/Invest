@@ -30,15 +30,21 @@ interface HeroChartProps {
 }
 
 function filterByRange(snapshots: Snapshot[], range: TimeRange): Snapshot[] {
-  if (range === "all") return snapshots;
-  const now = Date.now();
+  if (range === "all" || snapshots.length === 0) return snapshots;
+  // Anchor the window to the newest snapshot rather than the wall clock, so
+  // short ranges still render when snapshots have a gap at the end (demo
+  // fixtures with frozen timestamps, paused crons, etc.).
+  const newest = snapshots.reduce(
+    (max, s) => Math.max(max, new Date(s.snapshot_at).getTime()),
+    0
+  );
   const ms: Record<string, number> = {
     "1d": 86400000,
     "1w": 604800000,
     "1m": 2592000000,
     "3m": 7776000000,
   };
-  const cutoff = now - (ms[range] ?? 0);
+  const cutoff = newest - (ms[range] ?? 0);
   return snapshots.filter(
     (s) => new Date(s.snapshot_at).getTime() >= cutoff
   );
@@ -109,7 +115,7 @@ export function HeroChart({ snapshots }: HeroChartProps) {
     return Math.ceil(labelCount / 12);
   }, [deduped]);
 
-  if (data.length === 0) {
+  if (snapshots.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center rounded-lg border border-border bg-card">
         <p className="text-sm text-muted-foreground">
@@ -119,8 +125,8 @@ export function HeroChart({ snapshots }: HeroChartProps) {
     );
   }
 
-  const first = data[0].value;
-  const last = data[data.length - 1].value;
+  const first = data[0]?.value ?? 0;
+  const last = data[data.length - 1]?.value ?? 0;
   const isGain = last >= first;
   const strokeColor = isGain ? chartColors.success : chartColors.destructive;
 
@@ -129,6 +135,14 @@ export function HeroChart({ snapshots }: HeroChartProps) {
       <div className="flex items-center justify-end">
         <TimeRangeSelector value={range} onChange={setRange} />
       </div>
+      {data.length === 0 ? (
+        /* keep the range selector reachable even when a window has no data */
+        <div className="flex h-48 items-center justify-center rounded-lg border border-border bg-card md:h-64">
+          <p className="text-sm text-muted-foreground">
+            No snapshots in this range.
+          </p>
+        </div>
+      ) : (
       <div className="h-48 w-full md:h-64">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={deduped}>
@@ -174,6 +188,7 @@ export function HeroChart({ snapshots }: HeroChartProps) {
           </AreaChart>
         </ResponsiveContainer>
       </div>
+      )}
     </div>
   );
 }
