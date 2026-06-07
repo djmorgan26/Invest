@@ -200,26 +200,42 @@ const FINAL_VALUE = 10_057.4;
 export const portfolioSnapshots: PortfolioSnapshot[] = (() => {
   const rng = makeRng(20260525);
   const snaps: PortfolioSnapshot[] = [];
-  let realized = 0;
   // Build a gently-upward equity curve with realistic chop.
   const totalGain = FINAL_VALUE - 10_000;
-  for (let d = 0; d <= HISTORY_DAYS; d++) {
-    const progress = d / HISTORY_DAYS;
-    // smooth drift + noise; ensure the last point lands on FINAL_VALUE
-    const drift = totalGain * progress;
-    const noise = (rng() - 0.45) * 22 * Math.sin(progress * Math.PI);
-    const total = d === HISTORY_DAYS ? FINAL_VALUE : 10_000 + drift + noise;
-    realized = (total - 10_000) * 0.78;
+  const push = (id: string, total: number, atMs: number) => {
+    const realized = (total - 10_000) * 0.78;
     const unrealized = total - 10_000 - realized;
     snaps.push({
-      id: `snap-${d}`,
+      id,
       cash: Math.round((total - unrealized * 0.5) * 100) / 100,
       unrealized_pnl: Math.round(unrealized * 100) / 100,
       realized_pnl: Math.round(realized * 100) / 100,
       total_value: Math.round(total * 100) / 100,
-      snapshot_at: iso(NOW - (HISTORY_DAYS - d) * DAY),
+      snapshot_at: iso(atMs),
     });
+  };
+  // Daily history up to (but not including) the final day...
+  let dayBeforeFinal = 10_000;
+  for (let d = 0; d < HISTORY_DAYS; d++) {
+    const progress = d / HISTORY_DAYS;
+    // smooth drift + noise
+    const drift = totalGain * progress;
+    const noise = (rng() - 0.45) * 22 * Math.sin(progress * Math.PI);
+    const total = 10_000 + drift + noise;
+    if (d === HISTORY_DAYS - 1) dayBeforeFinal = total;
+    push(`snap-${d}`, total, NOW - (HISTORY_DAYS - d) * DAY);
   }
+  // ...then an hourly tail across the final 24h so the 1D and 1W chart ranges
+  // have real intraday shape instead of a near-empty window.
+  const HOUR = DAY / 24;
+  for (let h = 23; h >= 1; h--) {
+    const progress = (24 - h) / 24;
+    const base = dayBeforeFinal + (FINAL_VALUE - dayBeforeFinal) * progress;
+    const noise = (rng() - 0.5) * 6;
+    push(`snap-h${h}`, base + noise, NOW - h * HOUR);
+  }
+  // ensure the last point lands on FINAL_VALUE
+  push(`snap-${HISTORY_DAYS}`, FINAL_VALUE, NOW);
   return snaps;
 })();
 
